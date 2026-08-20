@@ -1,69 +1,142 @@
 import os
 import shutil
-import re
 from datetime import datetime
 
 class RPiSystemManager:
-    # 动态匹配现行 OS 中驱动设置的位置 兼容旧版到 Trixie OS 统辖系统配置 
     CFG_PATH = "/boot/firmware/config.txt" if os.path.exists("/boot/firmware/config.txt") else "/boot/config.txt"
+    HISTORY_LOG = "driver_change_history.log"
     
+    # 显卡、音频等非相机系统 overlay（严禁误删）
+    SYSTEM_IGNORE_OVERLAYS = [
+        "vc4-kms-v3d", "vc4-fkms-v3d", "vc4-kms-v3d-pi4", "vc4-kms-v3d-pi5", 
+        "dwc2", "disable-bt", "disable-wifi", "i2c-rtc", "w1-gpio"
+    ]
+
     @staticmethod
     def check_permissions():
-        """提供基于系统的特权使用判定检测"""
         return os.geteuid() == 0
 
     @staticmethod
     def auto_scan_status():
-        """负责扫描当在运行前激活和失效的当前底层参数"""
+        """检索 [all] 区域或全局已生效的相机驱动"""
         try:
-            with open(RPiSystemManager.CFG_PATH, 'r') as f:
-                content = f.read()
-            # 正则截取未屏蔽的相关信息 (不含井号开头的）
-            active_mod = re.search(r"^dtoverlay=([a-zA-Z0-9_\-]+)", content, flags=re.MULTILINE)
-            active_det = re.search(r"^camera_auto_detect=(0|1)", content, flags=re.MULTILINE)
+            if not os.path.exists(RPiSystemManager.CFG_PATH):
+                return False, "[诊断] 未找到 config.txt 配置文件"
 
-            res_info = "[诊断]"
-            res_info += f" 当前活跃型号节点: dtoverlay={active_mod.group(1)} | " if active_mod else " (暂未检出被指向生效模组) | "
-            res_info += f" 设备auto策略开关值: {active_det.group(1)}" if active_det else ""
+            with open(RPiSystemManager.CFG_PATH, 'r', encoding='utf-8') as f:
+                lines = f.readlines()
+
+            current_section = "global"
+            all_section_overlays = []
+            other_camera_overlays = []
+            auto_detect = "未知"
+
+            for line in lines:
+                clean_line = line.strip()
+                if clean_line.startswith("#"):
+                    continue
+
+                if clean_line.startswith("[") and clean_line.endswith("]"):
+                    current_section = clean_line[1:-1].lower()
+                    continue
+
+                if "camera_auto_detect=" in clean_line:
+                    auto_detect = clean_line.split("=")[-1].strip()
+
+                if clean_line.startswith("dtoverlay="):
+                    overlay_name = clean_line.split("=")[-1].strip()
+                    if overlay_name in RPiSystemManager.SYSTEM_IGNORE_OVERLAYS:
+                        continue
+
+                    if current_section == "all":
+                        all_section_overlays.append(overlay_name)
+                    elif any(k in overlay_name.lower() for k in ["imx", "ov", "arducam", "camera"]):
+                        other_camera_overlays.append(overlay_name)
+
+            active_cam = all_section_overlays[-1] if all_section_overlays else (other_camera_overlays[-1] if other_camera_overlays else None)
+
+            if active_cam:
+                res_info = f"[已生效驱动]: dtoverlay={active_cam} | [自动探测]: {auto_detect}"
+            else:
+                res_info = f"[已生效驱动]: 无专用相机驱动 | [自动探测]: {auto_detect}"
+
             return True, res_info
         except Exception as e:
-            return False, f"[获取底层状态参数异常]: {e}"
+            return False, f"[检测异常]: {e}"
 
     @staticmethod
     def enforce_driver_target(target_overlay):
         if not RPiSystemManager.check_permissions():
-            return False, "系统权限验证驳回(Access Denied)：更改内核挂载请先利用 sudo 等执行最高提权。"
-            
-        backup_stamp = datetime.now().strftime("%y%m%d%H%M%S")
-        backup_f = RPiSystemManager.CFG_PATH + f".qa_bkp_{backup_stamp}"
+            return False, "权限不足：修改内核配置需要 sudo 权限。"
+
         try:
-            shutil.copy2(RPiSystemManager.CFG_PATH, backup_f)
-            
-            with open(RPiSystemManager.CFG_PATH, "r") as f:
-                 lines = f.readlines()
-                 
-            updated_doc = []
+            # 1. 记录变更日志到独立文件 (不污染 config.txt)
+            with open(RPiSystemManager.HISTORY_LOG, "a", encoding="utf-8") as log_f:
+                log_f.write(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] 变更驱动 -> dtoverlay={target_overlay}\n")
+
+            # 2. 仅保留单个固定备份文件
+            shutil.copy2(RPiSystemManager.CFG_PATH, RPiSystemManager.CFG_PATH + ".bak")
+
+            with open(RPiSystemManager.CFG_PATH, "r", encoding='utf-8') as f:
+                lines = f.readlines()
+
+            # 3. 查漏补缺与就地更新 (零备注、零多余废行)
+            cleaned_lines = []
+            has_auto_detect = False
+            has_all_section = False
+            current_section = "global"
+
             for ln in lines:
-                 # 去活默认系统设备侦听机制 (树莓系统必须关 0 才强制认自己的新版覆盖逻辑 )
-                 if "camera_auto_detect=1" in ln:
-                     updated_doc.append("camera_auto_detect=0\n")
-                     continue
-                 
-                 # Regex 阻断旧有的其它残留挂入项目 (不全,但针对通用核心清除屏蔽）  
-                 if ln.startswith("dtoverlay=") and ("ov" in ln or "imx" in ln or "arducam" in ln):
-                     updated_doc.append(f"# {ln.strip()} (注释自 QA Tool 环境覆盖)\n")
-                     continue
-                     
-                 updated_doc.append(ln)
+                raw = ln.strip()
 
-            # Insert bottom instruction appending 追放目标信息于末端载入 
-            updated_doc.append(f"\n# ====== 变更者: 工厂级检测产线治具管理程式 ====\n")
-            updated_doc.append(f"dtoverlay={target_overlay}\n")
+                # 清理历史可能遗留的工具注释行
+                if any(tag in raw for tag in ["Arducam 工具写入", "由测试工具覆盖替换", "注释自 QA Tool"]):
+                    continue
 
-            with open(RPiSystemManager.CFG_PATH, "w") as f:
-                f.writelines(updated_doc)
-                
-            return True, f"✅ 文件重新指向与应用写配覆合指令完成操作.  备份于 : {backup_f} 下记录生成..."
-            
+                if raw.startswith("[") and raw.endswith("]"):
+                    current_section = raw[1:-1].lower()
+                    if current_section == "all":
+                        has_all_section = True
+
+                # 规范化 camera_auto_detect=0
+                if raw.startswith("camera_auto_detect="):
+                    cleaned_lines.append("camera_auto_detect=0\n")
+                    has_auto_detect = True
+                    continue
+
+                # 移除旧的相机 overlay (保留显卡驱动)
+                if raw.startswith("dtoverlay="):
+                    drv = raw.split("=")[-1].strip()
+                    if drv not in RPiSystemManager.SYSTEM_IGNORE_OVERLAYS and any(k in drv for k in ["imx", "ov", "arducam", "hawkeye", "pivariety"]):
+                        continue  # 移除旧的相机驱动行
+
+                cleaned_lines.append(ln)
+
+            # 4. 组装新配置写入 [all] 分区
+            final_lines = []
+            target_entry = f"dtoverlay={target_overlay}\n"
+
+            if has_all_section:
+                for ln in cleaned_lines:
+                    final_lines.append(ln)
+                    if ln.strip().lower() == "[all]":
+                        if not has_auto_detect:
+                            final_lines.append("camera_auto_detect=0\n")
+                            has_auto_detect = True
+                        final_lines.append(target_entry)
+            else:
+                final_lines = cleaned_lines
+                if not final_lines[-1].endswith("\n"):
+                    final_lines.append("\n")
+                final_lines.append("\n[all]\n")
+                if not has_auto_detect:
+                    final_lines.append("camera_auto_detect=0\n")
+                final_lines.append(target_entry)
+
+            with open(RPiSystemManager.CFG_PATH, "w", encoding='utf-8') as f:
+                f.writelines(final_lines)
+
+            return True, f"驱动配置已更新为: dtoverlay={target_overlay}\n变更已记录至 {RPiSystemManager.HISTORY_LOG}"
+
         except Exception as crash:
-             return False, str(crash)
+            return False, str(crash)

@@ -4,16 +4,14 @@ import json
 DB_FILE = "camera_database.json"
 
 def deduce_overlay(sensor_name):
-    # 根据树莓派底层核心，匹配映射传感器名字以输出驱动项 overlays 命令
     sensor_map = {
         "hawkeye": "arducam-64mp",
-        "pivariety": "arducam-pivariety", 
+        "pivariety": "arducam-pivariety",
+        "ov64a40": "arducam-64mp" 
     }
     s = str(sensor_name).lower()
     return sensor_map.get(s, s)
 
-# 加载原始提示全套数据构建出的映射（全数据源支持初始化生成使用）
-# 包括了 CSV: B0031 OV5647 ~ B0584 IMX708 所有支持!
 CSV_SOURCE = [
     ("B0031", "OV5647"), ("B0032", "OV5647"), ("B0033", "OV5647"), ("B0033", "OV5647"), 
     ("B003301", "OV5647"), ("B0033C", "OV5647"), ("B0033R", "OV5647"), ("B0035", "OV5647"), 
@@ -47,7 +45,6 @@ CSV_SOURCE = [
 
 def generate_default_data():
     dataset = []
-    # 使用去重逻辑机制去处源中的多次重复数据。确保展示 UI不杂乱无章 
     sku_added = set()
     for row in CSV_SOURCE:
         sku = row[0].upper()
@@ -57,7 +54,7 @@ def generate_default_data():
                 "sku": sku, 
                 "sensor": sensor.lower(), 
                 "overlay": deduce_overlay(sensor), 
-                "desc": f"{sensor}系列标准装配机型(从大工厂库继承同步)"
+                "desc": f"{sensor.upper()} 模组"
             })
             sku_added.add(sku)
     return dataset
@@ -72,8 +69,13 @@ class DataEngine:
             return DEFAULT_CAMERAS
         try:
             with open(DB_FILE, "r", encoding="utf-8") as f:
-                return json.load(f)
-        except Exception as e:
+                data = json.load(f)
+                # 清洗旧缓存里的垃圾字眼
+                for item in data:
+                    if "(从大工厂库继承同步)" in item.get("desc", ""):
+                        item["desc"] = item["desc"].replace("(从大工厂库继承同步)", "").strip()
+                return data
+        except Exception:
             return DEFAULT_CAMERAS
             
     @staticmethod

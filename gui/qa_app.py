@@ -1,68 +1,231 @@
 import os
+import json
 import datetime
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, 
-    QComboBox, QPushButton, QTabWidget, QTextEdit, QMessageBox, QRadioButton, 
+    QPushButton, QTabWidget, QTextEdit, QMessageBox, QRadioButton, 
     QButtonGroup, QLineEdit, QSpinBox, QFileDialog, QProgressBar, QTableWidget, 
-    QTableWidgetItem, QHeaderView, QGroupBox, QGridLayout
+    QTableWidgetItem, QHeaderView, QGroupBox, QGridLayout, QCompleter, QFrame,
+    QSizePolicy
 )
-from PyQt6.QtCore import Qt, QProcess
+from PyQt6.QtCore import Qt, QProcess, QTimer, QStringListModel
+from PyQt6.QtGui import QPixmap
 
+# 兼容原有的核心库引用
 from core.def_database import DataEngine, generate_default_data, deduce_overlay
 from core.config_writer import RPiSystemManager
 
+SETTINGS_FILE = "app_settings.json"
+
+class AppSettings:
+    @staticmethod
+    def get_last_sku():
+        if os.path.exists(SETTINGS_FILE):
+            try:
+                with open(SETTINGS_FILE, "r", encoding="utf-8") as f:
+                    return json.load(f).get("last_selected_sku", "")
+            except:
+                return ""
+        return ""
+
+    @staticmethod
+    def set_last_sku(sku):
+        try:
+            with open(SETTINGS_FILE, "w", encoding="utf-8") as f:
+                json.dump({"last_selected_sku": sku}, f, ensure_ascii=False, indent=2)
+        except:
+            pass
+
+
 class QATestCenter(QMainWindow):
-    # 工业暗色系通用样式
-    FACTORY_STYLESHEET = """
-        QMainWindow { background-color: #212529; color: #f8f9fa;}
-        QWidget { color: #f8f9fa; font-family: 'Noto Sans CJK SC', 'Segoe UI', sans-serif;}
-        
-        QGroupBox {
-            border: 1px solid #495057; border-radius: 6px; 
-            margin-top: 15px; font-weight: bold; 
-            background-color: #343A40;
+    # ================= 顶级商业仪器质感 (Precision Clean Light) ================= #
+    STYLE_SHEET = """
+        /* 全局背景 */
+        QWidget {
+            background-color: #F1F5F9;
+            color: #0F172A;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans CJK SC", "WenQuanYi Zen Hei", sans-serif;
         }
-        QGroupBox::title { subcontrol-origin: margin; left: 12px; top: -8px; color: #CED4DA;}
-        
-        QLineEdit, QSpinBox, QComboBox {
-            background-color: #495057; border: 1px solid #6C757D; border-radius: 4px; 
-            padding: 5px; height: 32px; color: #f8f9fa;
+
+        /* 顶部导航与容器卡片 */
+        QFrame#MainContainer, QTabWidget::pane {
+            background-color: #FFFFFF;
+            border: 1px solid #E2E8F0;
+            border-radius: 12px;
+        }
+
+        /* 现代化胶囊 Tab 栏 */
+        QTabBar::tab {
+            background-color: transparent;
+            color: #64748B;
+            padding: 10px 24px;
+            margin: 4px 4px;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 14px;
+        }
+        QTabBar::tab:hover {
+            color: #0284C7;
+            background-color: #F1F5F9;
+        }
+        QTabBar::tab:selected {
+            background-color: #E0F2FE;
+            color: #0284C7;
+        }
+
+        /* 驱动核心配置卡片 (Hero Card) */
+        QFrame#HeroCard {
+            background-color: #F8FAFC;
+            border: 1px solid #E2E8F0;
+            border-radius: 12px;
+            padding: 24px;
+        }
+        QLabel#HeroTitle {
+            font-size: 24px;
+            font-weight: 800;
+            color: #0F172A;
+        }
+        QLabel#HeroSubtitle {
+            font-size: 14px;
+            color: #64748B;
+            font-weight: 500;
         }
         
-        QPushButton {
-            background-color: #0D6EFD; color: white; border-radius: 5px; 
-            padding: 8px; font-weight: bold; font-size: 14px; min-height: 40px;
+        /* 状态指示胶囊 */
+        QLabel#StatusBadge {
+            background-color: #ECFDF5;
+            border: 1px solid #A7F3D0;
+            border-radius: 16px;
+            color: #059669;
+            font-weight: bold;
+            padding: 6px 16px;
+            font-size: 13px;
         }
-        QPushButton:hover { background-color: #3B71CA; }
-        QPushButton:pressed { background-color: #1958b8; }
-        QPushButton#BtnAlert { background-color: #DC3545; }
-        QPushButton#BtnAlert:hover { background-color: #C82333; }
-        QPushButton#BtnSuccess { background-color: #198754; }
-        QPushButton#BtnSuccess:hover { background-color: #157347; }
-        QPushButton:disabled { background-color: #6C757D; color: #ADB5BD; }
-        
-        QTabWidget::pane { border: 1px solid #495057; background: #343A40; border-radius: 4px; }
-        QTabBar::tab { 
-            background: #212529; color: #ADB5BD; padding: 10px 20px; margin: 1px;
-            border-bottom: 2px solid transparent; 
+        QLabel#StatusBadgeEmpty {
+            background-color: #F8FAFC;
+            border: 1px solid #CBD5E1;
+            border-radius: 16px;
+            color: #64748B;
+            font-weight: bold;
+            padding: 6px 16px;
+            font-size: 13px;
         }
-        QTabBar::tab:selected { background: #343A40; color: #0D6EFD; border-bottom: 2px solid #0D6EFD; }
+
+        /* 全局胶囊搜索栏 (完美替换原先别扭的文字) */
+        QLineEdit#GlobalSearchBar {
+            background-color: #F8FAFC;
+            border: 1px solid #CBD5E1;
+            border-radius: 18px; 
+            padding: 8px 20px;
+            font-size: 13px;
+            color: #0F172A;
+        }
+        QLineEdit#GlobalSearchBar:focus {
+            background-color: #FFFFFF;
+            border: 2px solid #0284C7;
+            padding: 7px 19px; 
+        }
+        QLineEdit#GlobalSearchBar::placeholder {
+            color: #94A3B8;
+        }
+
+        /* 常规输入框 */
+        QLineEdit, QSpinBox {
+            background-color: #FFFFFF;
+            border: 1px solid #CBD5E1;
+            border-radius: 8px;
+            padding: 8px 14px;
+            color: #0F172A;
+            font-size: 13px;
+        }
+        QLineEdit:focus, QSpinBox:focus { border: 2px solid #0284C7; }
+        QLineEdit::placeholder { color: #94A3B8; }
+
+        /* 主操作按钮 (科技天青蓝) */
+        QPushButton#PrimaryActionBtn {
+            background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #0284C7, stop:1 #0369A1);
+            color: #FFFFFF;
+            border: none;
+            border-radius: 8px;
+            font-size: 15px;
+            font-weight: bold;
+            min-height: 48px;
+            max-width: 320px;
+        }
+        QPushButton#PrimaryActionBtn:hover { background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #0369A1, stop:1 #075985); }
+        QPushButton#PrimaryActionBtn:pressed { background-color: #0C4A6E; }
+        QPushButton#PrimaryActionBtn:disabled { background: #CBD5E1; color: #F1F5F9; }
+
+        /* 危险/停止按钮 */
+        QPushButton#DangerActionBtn {
+            background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #EF4444, stop:1 #DC2626);
+            color: #FFFFFF;
+            border: none;
+            border-radius: 8px;
+            font-size: 15px;
+            font-weight: bold;
+            min-height: 48px;
+            max-width: 260px;
+        }
+        QPushButton#DangerActionBtn:hover { background: #B91C1C; }
+
+        /* 次要/线框按钮 */
+        QPushButton#SecondaryBtn {
+            background-color: #FFFFFF; border: 1px solid #CBD5E1; color: #334155; border-radius: 8px; padding: 8px 16px; font-weight: bold;
+        }
+        QPushButton#SecondaryBtn:hover { background-color: #F8FAFC; color: #0F172A; }
+
+        /* 表格内微型操作按钮 (无边框轻量化设计) */
+        QPushButton#TableEditBtn {
+            background-color: #E0F2FE; color: #0284C7; border: none; border-radius: 6px; padding: 6px 12px; font-weight: bold;
+        }
+        QPushButton#TableEditBtn:hover { background-color: #BAE6FD; }
         
-        QTextEdit { background-color: #111; color: #A3E635; font-family: monospace; border: 1px solid #000; }
-        QTableWidget { background-color: #343A40; border: 1px solid #495057; gridline-color: #495057;}
-        QHeaderView::section { background-color: #212529; padding: 6px; font-weight: bold;}
+        QPushButton#TableDeleteBtn {
+            background-color: #FEF2F2; color: #EF4444; border: none; border-radius: 6px; padding: 6px 12px; font-weight: bold;
+        }
+        QPushButton#TableDeleteBtn:hover { background-color: #FECACA; }
+
+        /* 单选框与进度条 */
+        QRadioButton { spacing: 10px; font-weight: 600; color: #334155; font-size: 14px; }
+        QRadioButton::indicator { width: 16px; height: 16px; border-radius: 8px; border: 2px solid #CBD5E1; background: #FFFFFF; }
+        QRadioButton::indicator:checked { border: 2px solid #0284C7; background-color: #0284C7; }
+
+        /* 表格控件 */
+        QTableWidget {
+            background-color: #FFFFFF;
+            alternate-background-color: #F8FAFC;
+            border: 1px solid #E2E8F0;
+            border-radius: 8px;
+            gridline-color: transparent;
+        }
+        QTableWidget::item { padding: 4px 14px; border-bottom: 1px solid #F1F5F9; }
+        QTableWidget::item:selected { background-color: #F1F5F9; color: #0F172A; }
+        QHeaderView::section { background-color: #F8FAFC; color: #475569; padding: 10px 14px; border: none; border-bottom: 2px solid #E2E8F0; font-weight: bold; }
+        
+        QProgressBar { text-align: center; font-weight: bold; border-radius: 6px; background-color: #F8FAFC; border: 1px solid #E2E8F0; color: #475569;}
+        QProgressBar::chunk { background-color: #0284C7; border-radius: 5px; }
+
+        /* 终端控制台 */
+        QTextEdit#ConsoleBox {
+            background-color: #0B0F19; border: 1px solid #1E293B; border-radius: 10px; color: #38BDF8; font-family: "JetBrains Mono", "Consolas", monospace; font-size: 12px; padding: 12px;
+        }
+        QScrollBar:vertical { border: none; background: transparent; width: 8px; margin: 0px; }
+        QScrollBar::handle:vertical { background: #CBD5E1; min-height: 20px; border-radius: 4px; }
+        QScrollBar::handle:vertical:hover { background: #94A3B8; }
     """
 
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Arducam Production QA Tool V1.2.0")
-        self.resize(1024, 768)
-        self.setStyleSheet(self.FACTORY_STYLESHEET)
+        self.setWindowTitle("Arducam Precision Studio")
+        self.resize(1080, 800)
+        self.setStyleSheet(self.STYLE_SHEET)
         
         self.data_records = DataEngine.fetch_records()
-        self.select_focus = None 
+        self.active_in_test_sku = None 
+        self.staged_target_sku = None 
         
-        # QProcess 异步进程对象
+        # 进程管理器
         self.cam_job = QProcess()
         self.cam_job.readyReadStandardOutput.connect(lambda: self._proc_std(self.cam_job, False))
         self.cam_job.readyReadStandardError.connect(lambda: self._proc_std(self.cam_job, True))
@@ -74,179 +237,277 @@ class QATestCenter(QMainWindow):
 
         self.test_engine = QProcess()
         self.test_engine.finished.connect(self._age_iteration_fin)
-        self.a_tot = 0; self.a_cur = 0; self.a_ok = 0; self.a_fail = 0; self.a_sig = False
+        self.test_engine.readyReadStandardOutput.connect(lambda: self._proc_std(self.test_engine, False))
+        self.test_engine.readyReadStandardError.connect(lambda: self._proc_std(self.test_engine, True))
         
+        self.a_tot = 0; self.a_cur = 0; self.a_ok = 0; self.a_fail = 0; self.a_sig = False
         self._construct_canvas()
 
-    def out_print(self, msg_str, severity_clr="#00FF00"):
+    def out_print(self, msg_str, severity_clr="#38BDF8"):
         time_pref = datetime.datetime.now().strftime("[%H:%M:%S]")
         formatted = f'<span style="color:{severity_clr};">{time_pref} {msg_str}</span>'
         self.logs.append(formatted)
         self.logs.verticalScrollBar().setValue(self.logs.verticalScrollBar().maximum())
          
     def _proc_std(self, proc_node, is_error):
-        color = "#F44336" if is_error else "#D4D4D8"
-        content_payload = proc_node.readAllStandardError() if is_error else proc_node.readAllStandardOutput()
-        msg = content_payload.data().decode("utf-8", "ignore").strip()
-        if msg: 
-            self.out_print(msg, color)
+        color = "#EF4444" if is_error else "#CBD5E1"
+        content = proc_node.readAllStandardError() if is_error else proc_node.readAllStandardOutput()
+        msg = content.data().decode("utf-8", "ignore").strip()
+        if msg: self.out_print(msg, color)
+
+    def _create_brand_logo(self):
+        logo_container = QWidget()
+        l_layout = QHBoxLayout(logo_container)
+        l_layout.setContentsMargins(0, 0, 8, 0)
+        
+        brand_lbl = QLabel("""
+            <div style='line-height:100%; margin-top:2px;'>
+                <span style='font-size:20px; font-weight:800; color:#0284C7;'>Ardu</span><span style='font-size:20px; font-weight:800; color:#0F172A;'>cam</span>
+                <span style='font-size:11px; font-weight:bold; color:#0F172A; margin-left:6px; padding:2px 6px; background:#E2E8F0; border-radius:4px;'>STUDIO</span>
+            </div>
+        """)
+        l_layout.addWidget(brand_lbl)
+        return logo_container
 
     def _construct_canvas(self):
         widget = QWidget()
         self.setCentralWidget(widget)
         topdown_grid = QVBoxLayout(widget)
+        topdown_grid.setContentsMargins(16, 16, 16, 16)
+        topdown_grid.setSpacing(14)
 
-        # 权限警告
         if not RPiSystemManager.check_permissions():
-            hint_q = QLabel("⚠️ Warning: Non-root user. Modifying /boot/config.txt requires sudo privileges.")
-            hint_q.setStyleSheet("background-color: #FFC107; color: #000; font-weight: bold; padding: 8px; border-radius: 4px;")
+            hint_q = QLabel("系统权限提示: 当前未以 Root 启动，驱动配置烧录功能将受限。")
+            hint_q.setStyleSheet("background-color: #FEF2F2; color: #DC2626; font-weight: bold; padding: 8px 14px; border-radius: 8px; border: 1px solid #FCA5A5;")
             topdown_grid.addWidget(hint_q)
 
-        # Top Bar
+        # -----------------------------------------------------------------
+        # FIX: 彻底去掉“切换SKU”文字，升级为 Mac Spotlight 风格大胶囊搜索栏
+        # -----------------------------------------------------------------
         banner = QHBoxLayout()
-        _, dev_s = RPiSystemManager.auto_scan_status()
-        self.top_os_sensor_lbl = QLabel(f"{dev_s}")
-        self.top_os_sensor_lbl.setStyleSheet("color: #0DCAF0; font-weight: bold;")
+        banner.addWidget(self._create_brand_logo())
+
+        self.top_current_sku_badge = QLabel("正在初始化状态...")
+        self.top_current_sku_badge.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+        self.top_current_sku_badge.setFixedHeight(34)
+        banner.addWidget(self.top_current_sku_badge)
+
+        banner.addStretch() 
         
-        sku_indict = QLabel("选择被测型号 (Select SKU):")
-        self.box_camsel = QComboBox()
-        self.box_camsel.setMinimumWidth(320)
-        self.box_camsel.currentIndexChanged.connect(self._selection_reacting_call)
-        
-        banner.addWidget(self.top_os_sensor_lbl, stretch=2)
-        banner.addWidget(sku_indict)
-        banner.addWidget(self.box_camsel)
+        self.search_input = QLineEdit()
+        self.search_input.setObjectName("GlobalSearchBar")
+        self.search_input.setPlaceholderText("🔍 搜索并快速切换 SKU 或 芯片型号...")
+        self.search_input.setFixedSize(400, 38) # 更宽更大气
+
+        self.search_model = QStringListModel()
+        self.completer = QCompleter(self.search_model, self)
+        self.completer.setCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
+        self.completer.setFilterMode(Qt.MatchFlag.MatchContains)
+        self.search_input.setCompleter(self.completer)
+        self.completer.activated.connect(self._on_search_selected)
+
+        banner.addWidget(self.search_input)
         topdown_grid.addLayout(banner)
 
-        # Tabs
+        # 核心工作区
         self.dash_tab = QTabWidget()
         self._tab_init()        
         self._tab_quality()      
         self._tab_foto()      
         self._tab_qa_age()      
         self._tab_catalog()       
-        topdown_grid.addWidget(self.dash_tab, stretch=7)
+        topdown_grid.addWidget(self.dash_tab, stretch=56)
         
-        # Bottom Console
-        term = QGroupBox("控制台日志 (Console Logs)")
+        # 控制台
+        term = QGroupBox("运行日志 (Runtime Logs)")
         lgy = QVBoxLayout()
-        self.logs = QTextEdit()
-        self.logs.setReadOnly(True)
-        clear_b = QPushButton("清空日志 (Clear Log)")
-        clear_b.setMinimumHeight(30)
-        clear_b.clicked.connect(self.logs.clear)
-        lgy.addWidget(self.logs)
-        lgy.addWidget(clear_b)
-        term.setLayout(lgy)
-        topdown_grid.addWidget(term, stretch=2)
+        lgy.setContentsMargins(14, 14, 14, 14)
         
-        self._push_cb_data_init()
-        self.out_print("System initialized successfully.", "#28A745")
+        self.logs = QTextEdit()
+        self.logs.setObjectName("ConsoleBox")
+        self.logs.setReadOnly(True)
+        
+        clr_box = QHBoxLayout()
+        clr_box.addStretch()
+        clr_btn = QPushButton("清除日志")
+        clr_btn.setObjectName("SecondaryBtn")
+        clr_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        clr_btn.clicked.connect(self.logs.clear)
+        clr_box.addWidget(clr_btn)
 
-    def _push_cb_data_init(self):
-        self.box_camsel.blockSignals(True)
-        self.box_camsel.clear()
-        for idx in self.data_records:
-            self.box_camsel.addItem(f"{idx['sku']} | {idx['sensor'].upper()} - {idx['desc']}", userData=idx)
-        self.box_camsel.blockSignals(False)
-        self.box_camsel.setCurrentIndex(0)
-        self._selection_reacting_call()
+        lgy.addWidget(self.logs)
+        lgy.addLayout(clr_box)
+        term.setLayout(lgy)
+        topdown_grid.addWidget(term, stretch=44)
+        
+        self._sync_app_state()
+        self.out_print("Arducam Precision Studio 界面系统初始化完成。", "#059669")
 
-    def _selection_reacting_call(self):
-        if self.box_camsel.count() <= 0: 
-            return 
-        d = self.box_camsel.currentData()
-        self.select_focus = d
-        if hasattr(self, 'label_bind'):
-            self.label_bind.setText(f"当前选中: SKU [{d['sku']}] | Sensor [{d['sensor'].upper()}]\n即将写入指令: dtoverlay={d['overlay']}")
+    def _sync_app_state(self):
+        """同步数据到模型及UI状态"""
+        completion_str_list = [f"{item['sku']} | {item['sensor'].upper()} - {item['desc']}" for item in self.data_records]
+        self.search_model.setStringList(completion_str_list)
+        
+        saved_sku = AppSettings.get_last_sku()
+        saved_item = next((d for d in self.data_records if d['sku'] == saved_sku), None)
+        
+        if saved_item:
+            self.active_in_test_sku = saved_item
+            self.top_current_sku_badge.setText(f"● 正在测试模组：{saved_item['sku']} ({saved_item['sensor'].upper()})")
+            self.top_current_sku_badge.setObjectName("StatusBadge")
+        else:
+            self.top_current_sku_badge.setText("○ 未配置挂载目标")
+            self.top_current_sku_badge.setObjectName("StatusBadgeEmpty")
+            
+        self.top_current_sku_badge.style().unpolish(self.top_current_sku_badge)
+        self.top_current_sku_badge.style().polish(self.top_current_sku_badge)
+
+    def _on_search_selected(self, text):
+        sku_val = text.split('|')[0].strip()
+        matched = next((item for item in self.data_records if item['sku'] == sku_val), None)
+        
+        if matched:
+            self.staged_target_sku = matched
+            if hasattr(self, 'target_card_sku_lbl'):
+                self.target_card_sku_lbl.setText(f"{matched['sku']} · {matched['sensor'].upper()}")
+                self.target_card_detail_lbl.setText(f"映射驱动: dtoverlay={matched['overlay']}  |  {matched['desc']}")
+                self.out_print(f"已暂存配置目标: {sku_val}，请前往[驱动配置]页点击应用。", "#38BDF8")
+
+        QTimer.singleShot(0, self.search_input.clear)
+        QTimer.singleShot(0, self.search_input.clearFocus)
 
     def __check_res(self):
         if self.cam_job.state() != QProcess.ProcessState.NotRunning:
-            QMessageBox.warning(self, "Device Busy", "相机正在被预览占用，请先停止预览再执行此操作。")
+            QMessageBox.warning(self, "资源冲突", "相机被预览进程占用，请先停止画面质检。")
             return False 
         return True
 
-    # ---------- Tab 1 : Driver Config ----------
+    # ---------- 1. 驱动配置 ----------
     def _tab_init(self):
         ui_q = QWidget()
         y = QVBoxLayout(ui_q)
-        area = QGroupBox("系统驱动配置 (Driver Setup)")
-        ay = QVBoxLayout()
-        self.label_bind = QLabel("")
-        self.label_bind.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.label_bind.setStyleSheet("font-size: 15px; margin: 15px 0; color: #FFF;")
+        y.setContentsMargins(18, 18, 18, 18)
         
-        btn_go = QPushButton("⚙️ 写入系统驱动 (Write config.txt)")
-        btn_go.setObjectName("BtnSuccess")
+        y.addStretch(1) 
+        
+        card_container = QHBoxLayout()
+        card_container.addStretch()
+        
+        hero_card = QFrame()
+        hero_card.setObjectName("HeroCard")
+        hero_card.setMinimumWidth(500)
+        hero_card.setMaximumWidth(600)
+        h_layout = QVBoxLayout(hero_card)
+        h_layout.setSpacing(12)
+        
+        self.target_card_sku_lbl = QLabel("请在右上角搜索并选择SKU")
+        self.target_card_sku_lbl.setObjectName("HeroTitle")
+        self.target_card_sku_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        
+        self.target_card_detail_lbl = QLabel("等待指定配置...")
+        self.target_card_detail_lbl.setObjectName("HeroSubtitle")
+        self.target_card_detail_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        
+        h_layout.addWidget(self.target_card_sku_lbl)
+        h_layout.addWidget(self.target_card_detail_lbl)
+        
+        card_container.addWidget(hero_card)
+        card_container.addStretch()
+        y.addLayout(card_container)
+        
+        y.addSpacing(32) 
+        
+        btn_container = QHBoxLayout()
+        btn_container.addStretch()
+        
+        btn_go = QPushButton("✔ 确定")
+        btn_go.setObjectName("PrimaryActionBtn")
+        btn_go.setFixedSize(320, 48)
+        btn_go.setCursor(Qt.CursorShape.PointingHandCursor)
         btn_go.clicked.connect(self._run_rewrite_rpi_sys)
+        btn_container.addWidget(btn_go)
+        btn_container.addStretch()
         
-        desp = QLabel("说明: 写入配置前会自动备份原文件为 .bak。修改后必须重启树莓派方可点亮相机。")
-        desp.setStyleSheet("color: #ADB5BD;")
+        y.addLayout(btn_container)
+        y.addStretch(2) 
         
-        ay.addWidget(self.label_bind)
-        ay.addWidget(desp)
-        ay.addWidget(btn_go)
-        area.setLayout(ay)
-        y.addWidget(area)
-        y.addStretch()
-        self.dash_tab.addTab(ui_q, "1. 驱动配置 (Driver)")
+        self.dash_tab.addTab(ui_q, "1. 驱动配置")
          
     def _run_rewrite_rpi_sys(self):
-        code, resp = RPiSystemManager.enforce_driver_target(self.select_focus['overlay'])
+        if not self.staged_target_sku:
+            QMessageBox.warning(self, "提示", "请先在右上角搜索并选中目标 SKU！")
+            return
+
+        target = self.staged_target_sku
+        code, resp = RPiSystemManager.enforce_driver_target(target['overlay'])
         if not code: 
-            QMessageBox.critical(self, "Error", f"写入失败:\n{resp}")
+            QMessageBox.critical(self, "写入失败", f"无法修改系统配置文件，请检查 Root 权限:\n{resp}")
         else:
-            ok = QMessageBox.question(self, "Success", f"{resp}\n驱动写入成功！是否立即重启树莓派？", QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+            AppSettings.set_last_sku(target['sku'])
+            self._sync_app_state()
+            
+            ok = QMessageBox.question(self, "配置完成", f"驱动已成功更新为: dtoverlay={target['overlay']}\n\n是否立即重启设备以生效？", QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
             if ok == QMessageBox.StandardButton.Yes: 
                 QProcess.startDetached("sudo", ["reboot"])
 
-    # ---------- Tab 2 : Preview QA ----------
+    # ---------- 2. 画面质检 ----------
     def _tab_quality(self):
         pan = QWidget()
         vlay = QVBoxLayout(pan)
-        cfg_r = QGroupBox("预览模式选择 (Preview Mode)")
-        ly = QHBoxLayout()
+        vlay.setContentsMargins(18, 18, 18, 18)
         
-        self.rad_w = QRadioButton("窗口预览 (Window Mode: rpicam-still -t 0)")
+        cfg_r = QGroupBox("视觉预览参数")
+        ly = QHBoxLayout()
+        ly.setContentsMargins(20, 24, 20, 24)
+        
+        self.rad_w = QRadioButton("标准窗口模式")
         self.rad_w.setChecked(True)
-        self.rad_f = QRadioButton("全屏质检 (Fullscreen Mode: rpicam-still -t 0 -f)")
+        self.rad_f = QRadioButton("全屏模式")
         
         ly.addWidget(self.rad_w)
         ly.addWidget(self.rad_f)
         cfg_r.setLayout(ly)
         vlay.addWidget(cfg_r)
         
-        self.btn_act = QPushButton("▶ 开启实时画面预览 (Start Preview)")
-        self.btn_act.setObjectName("BtnSuccess")
-        self.btn_act.setMinimumHeight(55)
-        self.btn_act.clicked.connect(self._fire_cam_visual)
-        vlay.addWidget(self.btn_act)
-        vlay.addStretch()
+        vlay.addSpacing(20)
         
-        self.dash_tab.addTab(pan, "2. 画面质检 (Preview)")
+        btn_box = QHBoxLayout()
+        btn_box.addStretch()
+        self.btn_act = QPushButton("启动实时画面流")
+        self.btn_act.setObjectName("PrimaryActionBtn")
+        self.btn_act.setFixedSize(320, 48)
+        self.btn_act.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_act.clicked.connect(self._fire_cam_visual)
+        btn_box.addWidget(self.btn_act)
+        btn_box.addStretch()
+        
+        vlay.addLayout(btn_box)
+        vlay.addStretch()
+        self.dash_tab.addTab(pan, "2. 画面质检")
         
     def _fire_cam_visual(self):
         if self.cam_job.state() == QProcess.ProcessState.NotRunning:
             opts = ["-t", "0"]
-            if self.rad_f.isChecked(): 
-                opts.append("-f")
+            if self.rad_f.isChecked(): opts.append("-f")
             self.cam_job.start("rpicam-still", opts)
-            self.btn_act.setText("⏹ 停止画面预览 (Stop Preview)")
-            self.btn_act.setObjectName("BtnAlert")
+            self.btn_act.setText("终止预览进程")
+            self.btn_act.setObjectName("DangerActionBtn")
             self.btn_act.setStyle(self.btn_act.style())
         else:
             self.cam_job.terminate()
             self.cam_job.waitForFinished(1000)
             if self.cam_job.state() != QProcess.ProcessState.NotRunning: 
                 self.cam_job.kill() 
-            self.btn_act.setText("▶ 开启实时画面预览 (Start Preview)")
-            self.btn_act.setObjectName("BtnSuccess")
+            self.btn_act.setText("启动实时画面流")
+            self.btn_act.setObjectName("PrimaryActionBtn")
             self.btn_act.setStyle(self.btn_act.style())
 
-    # ---------- Tab 3 : Capture Image ----------
+    # ---------- 3. 单张拍照 ----------
     def _tab_foto(self):
         u = QWidget()
         a = QVBoxLayout(u)
+        a.setContentsMargins(18, 18, 18, 18)
+        
         self.pt = QLineEdit(os.path.expanduser("~/Pictures/QA_Captures"))
         self.dl = QSpinBox()
         self.dl.setRange(20, 60000)
@@ -254,244 +515,331 @@ class QATestCenter(QMainWindow):
         self.nt = QLineEdit("{sensor}_{time}.jpg")
         
         gp = QGridLayout()
-        gp.addWidget(QLabel("保存目录 (Save Directory):"), 0, 0)
-        bb = QPushButton("浏览 (Browse...)")
+        gp.setContentsMargins(20, 24, 20, 24)
+        gp.setHorizontalSpacing(16)
+        gp.setVerticalSpacing(16)
+        
+        gp.addWidget(QLabel("图片保存路径:"), 0, 0)
+        bb = QPushButton("浏览...")
+        bb.setObjectName("SecondaryBtn")
+        bb.setCursor(Qt.CursorShape.PointingHandCursor)
         bb.clicked.connect(self._go_br_folder)
         f_l = QHBoxLayout()
         f_l.addWidget(self.pt, stretch=3)
         f_l.addWidget(bb, stretch=1)
         gp.addLayout(f_l, 0, 1)
         
-        gp.addWidget(QLabel("曝光等待延时 (Delay ms):"), 1, 0)
+        gp.addWidget(QLabel("预览时间 (ms):"), 1, 0)
         gp.addWidget(self.dl, 1, 1)
         
-        gp.addWidget(QLabel("文件名规则 (File Name):"), 2, 0)
+        gp.addWidget(QLabel("文件命名规则:"), 2, 0)
         gp.addWidget(self.nt, 2, 1)
         
-        gg = QGroupBox("拍照参数配置 (Capture Settings)")
+        gg = QGroupBox("图像捕获配置")
         gg.setLayout(gp)
+        a.addWidget(gg)
         
-        self.bp = QPushButton("📸 执行单张拍照 (Capture Once)")
-        self.bp.setObjectName("BtnSuccess")
+        
+        a.addSpacing(20)
+        
+        btn_box = QHBoxLayout()
+        btn_box.addStretch()
+        
+        bo = QPushButton("打开文件夹")
+        bo.setObjectName("SecondaryBtn")
+        bo.setFixedSize(140, 48)
+        bo.setCursor(Qt.CursorShape.PointingHandCursor)
+        bo.clicked.connect(lambda: QProcess.startDetached("xdg-open", [self.pt.text()]) if os.path.exists(self.pt.text()) else None)
+        
+        self.bp = QPushButton("执行单帧抓拍")
+        self.bp.setObjectName("PrimaryActionBtn")
+        self.bp.setFixedSize(260, 48)
+        self.bp.setCursor(Qt.CursorShape.PointingHandCursor)
         self.bp.clicked.connect(self._go_s_click)
         
-        bo = QPushButton("📁 打开保存文件夹 (Open Folder)")
-        bo.clicked.connect(lambda: QProcess.startDetached("xdg-open", [self.pt.text()]) if os.path.exists(self.pt.text()) else None)
-
-        a.addWidget(gg)
-        a.addWidget(self.bp)
-        a.addWidget(bo)
+        btn_box.addWidget(bo)
+        btn_box.addSpacing(16)
+        btn_box.addWidget(self.bp)
+        btn_box.addStretch()
+        
+        a.addLayout(btn_box)
         a.addStretch()
-        self.dash_tab.addTab(u, "3. 单张拍照 (Capture)")
+        self.dash_tab.addTab(u, "3. 单张拍照")
     
     def _go_br_folder(self):
-        res = QFileDialog.getExistingDirectory(self, "Select Directory", self.pt.text())
-        if res: 
-            self.pt.setText(res)
+        res = QFileDialog.getExistingDirectory(self, "选择保存目录", self.pt.text())
+        if res: self.pt.setText(res)
 
     def _go_s_click(self):
-        if not self.__check_res(): 
-            return
+        if not self.__check_res(): return
+            
+        sensor_tag = self.active_in_test_sku['sensor'] if self.active_in_test_sku else "camera"
         os.makedirs(self.pt.text(), exist_ok=True)
-        targ_str = self.nt.text().replace("{sensor}", self.select_focus['sensor']).replace("{time}", datetime.datetime.now().strftime("%Y%m%d_%H%M%S"))
+        targ_str = self.nt.text().replace("{sensor}", sensor_tag).replace("{time}", datetime.datetime.now().strftime("%Y%m%d_%H%M%S"))
         dest_n = os.path.join(self.pt.text(), targ_str)
+        
         self.task_job.start("rpicam-still", ["-t", str(self.dl.value()), "-o", dest_n])
         self.bp.setEnabled(False)
-        self.bp.setText("Capturing...")
+        self.bp.setText("处理中...")
         self.last_target_n = dest_n
 
     def _task_end(self, stat):
         self.bp.setEnabled(True)
-        self.bp.setText("📸 执行单张拍照 (Capture Once)")
+        self.bp.setText("执行单帧抓拍")
         if stat == 0: 
-            self.out_print(f"Image saved: {self.last_target_n}", "#28A745")
+            self.out_print(f"图像已保存至: {self.last_target_n}", "#059669")
         else:
-            QMessageBox.critical(self, "Error", "拍照失败，请查看控制台报错输出。")
-            self.out_print("Capture failed.", "#DC3545")
+            QMessageBox.critical(self, "执行失败", "抓拍进程异常，请查看日志。")
+            self.out_print("捕获任务失败。", "#DC2626")
 
-    # ---------- Tab 4 : Stress Test (Burn-in) ----------
+    # ---------- 4. 压力测试 ----------
     def _tab_qa_age(self):
         c = QWidget()
         y = QVBoxLayout(c)
-        o_group = QGroupBox("测试轮次配置 (Cycle Settings)")
-        o_g = QHBoxLayout()
+        y.setContentsMargins(18, 18, 18, 18)
+        
+        top_row = QHBoxLayout()
+        top_row.setSpacing(16)
         self.age_bs = QButtonGroup(self)
         
-        self.r_opt_10 = QRadioButton("10 次 (Quick QA)")
+        self.r_opt_10 = QRadioButton("10 次 (快速抽检)")
         self.r_opt_10.setProperty('ov', 10)
-        self.r_opt_50 = QRadioButton("50 次 (Standard)")
+        self.r_opt_50 = QRadioButton("50 次 (标准产测)")
         self.r_opt_50.setProperty('ov', 50)
         self.r_opt_50.setChecked(True)
-        self.r_opt_500 = QRadioButton("500 次 (Burn-in)")
+        self.r_opt_500 = QRadioButton("500 次 (极限老化)")
         self.r_opt_500.setProperty('ov', 500)
         
         self.age_bs.addButton(self.r_opt_10)
         self.age_bs.addButton(self.r_opt_50)
         self.age_bs.addButton(self.r_opt_500)
 
-        o_g.addWidget(self.r_opt_10)
-        o_g.addWidget(self.r_opt_50)
-        o_g.addWidget(self.r_opt_500)
+        top_row.addWidget(self.r_opt_10)
+        top_row.addWidget(self.r_opt_50)
+        top_row.addWidget(self.r_opt_500)
         
-        self.r_custom = QRadioButton("自定义 (Custom):")
+        self.r_custom = QRadioButton("自定义轮数:")
         self.spin_b = QSpinBox()
         self.spin_b.setRange(1, 10000)
         self.spin_b.setValue(100)
         self.age_bs.addButton(self.r_custom)
         
-        o_g.addWidget(self.r_custom)
-        o_g.addWidget(self.spin_b)
-        o_group.setLayout(o_g)
-        y.addWidget(o_group)
-
-        # 实时看板
-        s_dash = QWidget()
-        s_dash.setStyleSheet("background-color: #212529; border: 1px solid #6C757D; border-radius: 6px;")
-        l1 = QVBoxLayout(s_dash)
+        top_row.addWidget(self.r_custom)
+        top_row.addWidget(self.spin_b)
         
-        self.da_st = QLabel("状态: 待机空闲 (Idle)")
-        self.da_st.setStyleSheet("color: #FFC107; font-weight: bold; font-size: 16px;")
+        opt_group = QGroupBox("老化测试策略")
+        opt_group.setLayout(top_row)
+        y.addWidget(opt_group)
+
+        s_dash = QFrame()
+        s_dash.setObjectName("CardPanel")
+        l1 = QVBoxLayout(s_dash)
+        l1.setContentsMargins(20, 24, 20, 24)
+        l1.setSpacing(14)
+        
+        self.da_st = QLabel("引擎状态: 待机中")
+        self.da_st.setStyleSheet("color: #64748B; font-weight: bold; font-size: 14px;")
         self.da_st.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        self.da_no = QLabel("进度: 0 / 0 | 成功 (Pass): 0 | 失败 (Fail): 0")
+        self.da_no = QLabel("进度：0 / 0  |  通过：0  |  失败：0")
         self.da_no.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.da_no.setStyleSheet("font-size: 18px; font-weight: bold; margin: 10px 0;")
+        self.da_no.setStyleSheet("font-size: 16px; font-weight: 800; color: #0F172A;")
         
         self.bar = QProgressBar()
-        self.bar.setFixedHeight(26)
-        self.bar.setStyleSheet("QProgressBar { text-align: center; font-weight: bold; } QProgressBar::chunk { background: #198754; }")
+        self.bar.setFixedHeight(14)
         
         l1.addWidget(self.da_st)
         l1.addWidget(self.da_no)
         l1.addWidget(self.bar)
         y.addWidget(s_dash)
+        
+        y.addSpacing(16)
 
-        # 控制按钮
         ch = QHBoxLayout()
-        self.bg = QPushButton("▶ 开始压力测试 (Start Stress Test)")
-        self.bg.setObjectName("BtnSuccess")
-        self.stg = QPushButton("⏹ 强制停止 (Stop)")
-        self.stg.setObjectName("BtnAlert")
+        ch.addStretch()
+        
+        self.stg = QPushButton("中止测试")
+        self.stg.setObjectName("DangerActionBtn")
+        self.stg.setFixedSize(140, 48)
         self.stg.setEnabled(False)
-
-        self.bg.clicked.connect(self._boot_age_chain)
+        self.stg.setCursor(Qt.CursorShape.PointingHandCursor)
         self.stg.clicked.connect(self._sstop_chain)
-        ch.addWidget(self.bg, stretch=2)
-        ch.addWidget(self.stg, stretch=1)
+        
+        self.bg = QPushButton("开始执行压力测试")
+        self.bg.setObjectName("PrimaryActionBtn")
+        self.bg.setFixedSize(260, 48)
+        self.bg.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.bg.clicked.connect(self._boot_age_chain)
+        
+        ch.addWidget(self.stg)
+        ch.addSpacing(16)
+        ch.addWidget(self.bg)
+        ch.addStretch()
+        
         y.addLayout(ch)
-
-        self.dash_tab.addTab(c, "4. 压力测试 (Stress Test)")
+        y.addStretch()
+        self.dash_tab.addTab(c, "4. 压力测试")
 
     def _boot_age_chain(self):
-        if not self.__check_res(): 
-            return
-        
+        if not self.__check_res(): return
         self.a_tot = 50
         for x in self.age_bs.buttons():
             if x.isChecked():
                 self.a_tot = self.spin_b.value() if x == self.r_custom else x.property('ov')
                 break
 
-        self.a_sig = False
-        self.a_cur = 0
-        self.a_ok = 0
-        self.a_fail = 0
-        
-        self.bg.setEnabled(False)
-        self.stg.setEnabled(True)
+        self.a_sig = False; self.a_cur = 0; self.a_ok = 0; self.a_fail = 0
+        self.bg.setEnabled(False); self.stg.setEnabled(True)
         self.bar.setMaximum(self.a_tot)
         self.bar.setValue(0)
-        
-        self.da_st.setText("状态: 正在测试中 (Testing...)")
-        self.da_st.setStyleSheet("color: #0DCAF0; font-weight: bold; font-size: 16px;")
-        self.out_print(f"=== Stress Test Started: Total {self.a_tot} Cycles ===", "#0DCAF0")
+        self.da_st.setText("引擎状态: 测试执行中...")
+        self.da_st.setStyleSheet("color: #0284C7; font-weight: bold; font-size: 14px;")
+        self.out_print(f"> 压力测试启动，设定轮数: {self.a_tot}", "#0284C7")
         self._cyc_next_loop()
 
     def _cyc_next_loop(self):
         if self.a_sig or self.a_cur >= self.a_tot: 
-            self._conclu_chain()
-            return
+            self._conclu_chain(); return
         self.a_cur += 1 
         self.test_engine.start("rpicam-still", ["-t", "800", "-n"]) 
 
     def _age_iteration_fin(self, c_code):
-        if c_code == 0: 
-            self.a_ok += 1
+        if c_code == 0: self.a_ok += 1
         else:
             self.a_fail += 1
-            self.out_print(f"Cycle {self.a_cur} Failed with exit code {c_code}", "#F44336")
+            self.out_print(f"> 错误: 第 {self.a_cur} 轮进程异常 (Exit Code: {c_code})", "#DC2626")
         
-        self.da_no.setText(f"进度: {self.a_cur} / {self.a_tot} | 成功 (Pass): {self.a_ok} | 失败 (Fail): {self.a_fail}")
+        fstr = f"<span style='color:{'#DC2626' if self.a_fail>0 else '#64748B'};'>失败：{self.a_fail}</span>"
+        self.da_no.setText(f"进度：{self.a_cur} / {self.a_tot}  |  通过：<span style='color:#059669;'>{self.a_ok}</span>  |  {fstr}")
         self.bar.setValue(self.a_cur)
         self._cyc_next_loop()
 
     def _sstop_chain(self):
         self.a_sig = True 
-        self.da_st.setText("状态: 已被人工终止 (Stopped by User)")
-        self.da_st.setStyleSheet("color: #DC3545; font-weight: bold; font-size: 16px;")
+        self.da_st.setText("引擎状态: 人工介入终止")
+        self.da_st.setStyleSheet("color: #DC2626; font-weight: bold; font-size: 14px;")
         
     def _conclu_chain(self):
-        self.bg.setEnabled(True)
-        self.stg.setEnabled(False)
-        self.da_st.setText("状态: 测试完成 (Finished)")
-        self.da_st.setStyleSheet("color: #198754; font-weight: bold; font-size: 16px;")
-        self.out_print(f"=== Stress Test Finished. Pass: {self.a_ok}, Fail: {self.a_fail} ===", "#198754")
+        self.bg.setEnabled(True); self.stg.setEnabled(False)
+        if not self.a_sig:
+            self.da_st.setText("引擎状态: 任务已完成")
+            self.da_st.setStyleSheet("color: #059669; font-weight: bold; font-size: 14px;")
+        self.out_print(f"> 任务终结 | 达成: {self.a_ok} 轮，故障: {self.a_fail} 轮。", "#059669")
 
-    # ---------- Tab 5 : SKU Database Manager ----------
+    # ---------- 5. 型号库管理 (修复挤压，加入编辑功能) ----------
     def _tab_catalog(self):
         q = QWidget()
         vb = QVBoxLayout(q)
+        vb.setContentsMargins(18, 16, 18, 16)
+        vb.setSpacing(14)
         
-        # Form
-        u = QGroupBox("录入新相机型号 (Add New SKU)")
+        # === 表单区域 (上层，固定高度) ===
+        u = QGroupBox("产品档案注册与编辑")
         gl = QGridLayout()
+        gl.setContentsMargins(20, 24, 20, 24)
+        gl.setHorizontalSpacing(16)
+        gl.setVerticalSpacing(16)
         
-        gl.addWidget(QLabel("产品 SKU (必填):"), 0, 0)
+        gl.addWidget(QLabel("产品 SKU:"), 0, 0)
         self.ks = QLineEdit()
-        self.ks.setPlaceholderText("如: B0165")
+        self.ks.setPlaceholderText("例如: B0165")
         gl.addWidget(self.ks, 0, 1)
         
-        gl.addWidget(QLabel("Sensor 型号 (必填):"), 0, 2)
+        gl.addWidget(QLabel("芯片型号:"), 0, 2)
         self.sn = QLineEdit()
-        self.sn.setPlaceholderText("如: ov9281")
+        self.sn.setPlaceholderText("例如: ov9281")
         gl.addWidget(self.sn, 0, 3)
 
-        self.ovt = QLabel("dtoverlay: (自动生成)")
-        self.ovt.setStyleSheet("color: #0DCAF0;")
+        self.ovt = QLabel("系统驱动映射:")
+        self.ovt.setStyleSheet("color: #0369A1; font-weight: bold;")
         gl.addWidget(self.ovt, 1, 0, 1, 2)
-        self.sn.textChanged.connect(lambda txt: self.ovt.setText(f"dtoverlay: {deduce_overlay(txt.strip())}")) 
+        self.sn.textChanged.connect(lambda txt: self.ovt.setText(f"系统驱动映射: dtoverlay={deduce_overlay(txt.strip())}"))
 
-        gl.addWidget(QLabel("中文说明:"), 1, 2)
+        gl.addWidget(QLabel("备注说明:"), 1, 2)
         self.cd = QLineEdit()
-        self.cd.setPlaceholderText("如: OV9281 黑白全局快门")
+        self.cd.setPlaceholderText("选填，描述该模组特性")
         gl.addWidget(self.cd, 1, 3)
         
-        abb = QPushButton("💾 保存到数据库 (Save to DB)")
-        abb.setObjectName("BtnSuccess")
+        btn_box = QHBoxLayout()
+        btn_box.addStretch()
+        abb = QPushButton("确认归档入库")
+        abb.setObjectName("PrimaryActionBtn")
+        abb.setFixedSize(260, 44)
+        abb.setCursor(Qt.CursorShape.PointingHandCursor)
         abb.clicked.connect(self._ad_r_btn_event)
-        gl.addWidget(abb, 2, 0, 1, 4)
-        u.setLayout(gl)
-        vb.addWidget(u)
+        btn_box.addWidget(abb)
+        btn_box.addStretch()
         
-        # Table
-        ggb = QGroupBox("当前相机型号库 (Camera Database)")
+        gl.addLayout(btn_box, 2, 0, 1, 4)
+        u.setLayout(gl)
+        vb.addWidget(u) # 默认添加，不给 stretch，防止压扁下面的表
+        
+        # === 底部表格区域 (下层，填满剩余空间) ===
+        ggb = QGroupBox("系统设备映射库")
         gly = QVBoxLayout()
+        gly.setContentsMargins(14, 18, 14, 16)
+        gly.setSpacing(12)
+        
+        header_bar = QHBoxLayout()
+        self.filter_input = QLineEdit()
+        self.filter_input.setPlaceholderText("🔍 表格筛选 (输入 SKU 或芯片名称)")
+        self.filter_input.setFixedSize(300, 32)
+        self.filter_input.textChanged.connect(self._filter_table)
+        header_bar.addWidget(self.filter_input)
+        
+        header_bar.addStretch()
+        
+        rsb = QPushButton("恢复出厂库")
+        rsb.setObjectName("SecondaryBtn")
+        rsb.setCursor(Qt.CursorShape.PointingHandCursor)
+        rsb.clicked.connect(self._fc_rr_)
+        header_bar.addWidget(rsb)
+        gly.addLayout(header_bar)
+        
         self.ts = QTableWidget()
         self.ts.setColumnCount(4)
-        self.ts.setHorizontalHeaderLabels(["SKU / 芯片", "驱动 (Overlay)", "中文描述", "操作"])
-        self.ts.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self.ts.setHorizontalHeaderLabels(["SKU / 硬件芯片", "底层驱动 (Overlay)", "特性描述", "操作"])
         
-        rsb = QPushButton("🔄 恢复出厂默认型号库 (Reset Factory DB)")
-        rsb.setObjectName("BtnAlert")
-        rsb.clicked.connect(self._fc_rr_)
+        # 修复2: 指定明确的列宽拉伸策略，确保操作列有足够空间展示2个按钮
+        header = self.ts.horizontalHeader()
+        header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
+        header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+        header.setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
+        header.setSectionResizeMode(3, QHeaderView.ResizeMode.Fixed)
+        self.ts.setColumnWidth(3, 140) # 预留足够宽度给 [编辑][删除] 两个按钮
         
-        gly.addWidget(self.ts)
-        gly.addWidget(rsb)
+        self.ts.verticalHeader().setDefaultSectionSize(44)
+        self.ts.verticalHeader().setVisible(False) 
+        self.ts.setAlternatingRowColors(True)
+        self.ts.setShowGrid(False)
+        self.ts.setMinimumHeight(180) # 防挤压底线
+        
+        gly.addWidget(self.ts, stretch=1)
         ggb.setLayout(gly)
-        vb.addWidget(ggb)
+        
+        # 把表格盒子分配 stretch=1 充满剩余高度
+        vb.addWidget(ggb, stretch=1)
         
         self._rely()
-        self.dash_tab.addTab(q, "5. 型号库管理 (SKU Manager)")
+        self.dash_tab.addTab(q, "5. 型号库管理")
+
+    def _filter_table(self, text):
+        search_str = text.lower()
+        for row in range(self.ts.rowCount()):
+            match = False
+            for col in range(self.ts.columnCount() - 1):
+                item = self.ts.item(row, col)
+                if item and search_str in item.text().lower():
+                    match = True
+                    break
+            self.ts.setRowHidden(row, not match)
+            
+    # 【新增功能】点击编辑按钮，回填数据到表单
+    def _edit_record(self, item):
+        self.ks.setText(item['sku'])
+        self.sn.setText(item['sensor'])
+        self.cd.setText(item['desc'])
+        self.ks.setFocus() # 光标聚焦，引导用户
 
     def _ad_r_btn_event(self):
         sk = self.ks.text().upper().strip()
@@ -499,7 +847,7 @@ class QATestCenter(QMainWindow):
         ds = self.cd.text().strip()
         
         if not sk or not sns: 
-            QMessageBox.critical(self, "Error", "SKU 和 Sensor 均不能为空！")
+            QMessageBox.critical(self, "输入校验", "SKU 和 芯片型号必须完整填写。")
             return 
         
         exist_h = -1
@@ -509,27 +857,30 @@ class QATestCenter(QMainWindow):
                 break
         
         npck = {"sku": sk, "sensor": sns, "overlay": deduce_overlay(sns), "desc": ds}
+        
+        # 如果存在则替换 (即更新)，不存在则插入顶部
         if exist_h >= 0: 
-            self.data_records[exist_h] = npck
-        else: 
-            self.data_records.insert(0, npck)
+            self.data_records.pop(exist_h)
+        self.data_records.insert(0, npck)
             
         DataEngine.commit_records(self.data_records)
         self._rely()
-        self._push_cb_data_init()
+        self._sync_app_state()
+        
         self.ks.clear()
         self.sn.clear()
         self.cd.clear()
-        QMessageBox.information(self, "Success", f"型号 {sk} 保存成功！")
+        self.filter_input.clear() 
+        QMessageBox.information(self, "归档成功", f"模组档案 {sk} 已成功保存/更新至系统。")
 
     def _fc_rr_(self):
-        aa = QMessageBox.question(self, "Confirm Reset", "确定要清空自定义数据，恢复到出厂默认的型号库吗？", QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+        aa = QMessageBox.question(self, "安全确认", "此操作将抹除所有自定义记录并恢复默认库，是否继续？", QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
         if aa == QMessageBox.StandardButton.Yes: 
             self.data_records = generate_default_data() 
             DataEngine.commit_records(self.data_records)
             self._rely()
-            self._push_cb_data_init()
-            QMessageBox.information(self, "Success", "数据库已恢复出厂设置。")
+            self._sync_app_state()
+            QMessageBox.information(self, "恢复完成", "系统库已重置为出厂状态。")
               
     def _rely(self):
         self.ts.setRowCount(0)
@@ -539,15 +890,36 @@ class QATestCenter(QMainWindow):
             self.ts.setItem(rx, 1, QTableWidgetItem(o['overlay']))
             self.ts.setItem(rx, 2, QTableWidgetItem(o['desc']))
             
-            bk = QPushButton("删除 (Delete)")
-            bk.setStyleSheet("background-color: #DC3545; color: white; font-weight: bold;")
-            bk.clicked.connect(lambda _, target_i=o['sku']: self.__del_k(target_i))
-            self.ts.setCellWidget(rx, 3, bk)
+            # 【修复3】：使用水平布局优雅包装“编辑”和“删除”两个按钮
+            action_widget = QWidget()
+            action_layout = QHBoxLayout(action_widget)
+            action_layout.setContentsMargins(8, 4, 8, 4) # 合理边距防压扁
+            action_layout.setSpacing(8)
+            
+            # 编辑按钮
+            btn_edit = QPushButton("编辑")
+            btn_edit.setObjectName("TableEditBtn") 
+            btn_edit.setCursor(Qt.CursorShape.PointingHandCursor)
+            btn_edit.clicked.connect(lambda _, item=o: self._edit_record(item))
+            
+            # 删除按钮
+            btn_del = QPushButton("删除")
+            btn_del.setObjectName("TableDeleteBtn") 
+            btn_del.setCursor(Qt.CursorShape.PointingHandCursor)
+            btn_del.clicked.connect(lambda _, target_i=o['sku']: self.__del_k(target_i))
+            
+            action_layout.addWidget(btn_edit)
+            action_layout.addWidget(btn_del)
+            action_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            
+            self.ts.setCellWidget(rx, 3, action_widget)
+            
+        self._filter_table(self.filter_input.text())
               
     def __del_k(self, the_val):
-        rp = QMessageBox.question(self, "Confirm Delete", f"确定要从数据库中删除型号: {the_val} 吗？", QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+        rp = QMessageBox.question(self, "删除授权", f"是否从设备映射库中永久移除 {the_val} ？", QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
         if rp == QMessageBox.StandardButton.Yes:
             self.data_records = [x for x in self.data_records if x['sku'] != the_val]
             DataEngine.commit_records(self.data_records)
             self._rely()
-            self._push_cb_data_init()
+            self._sync_app_state()

@@ -1,0 +1,656 @@
+[
+    {
+        "sku": "B0670",
+        "sensor": "imx500",
+        "overlay": "imx500",
+        "desc": "AI"
+    },
+    {
+        "sku": "B0031",
+        "sensor": "ov5647",
+        "overlay": "ov5647",
+        "desc": "OV5647 模组"
+    },
+    {
+        "sku": "B0032",
+        "sensor": "ov5647",
+        "overlay": "ov5647",
+        "desc": "OV5647 模组"
+    },
+    {
+        "sku": "B0033",
+        "sensor": "ov5647",
+        "overlay": "ov5647",
+        "desc": "OV5647 模组"
+    },
+    {
+        "sku": "B003301",
+        "sensor": "ov5647",
+        "overlay": "ov5647",
+        "desc": "OV5647 模组"
+    },
+    {
+        "sku": "B0033C",
+        "sensor": "ov5647",
+        "overlay": "ov5647",
+        "desc": "OV5647 模组"
+    },
+    {
+        "sku": "B0033R",
+        "sensor": "ov5647",
+        "overlay": "ov5647",
+        "desc": "OV5647 模组"
+    },
+    {
+        "sku": "B0035",
+        "sensor": "ov5647",
+        "overlay": "ov5647",
+        "desc": "OV5647 模组"
+    },
+    {
+        "sku": "B003503",
+        "sensor": "ov5647",
+        "overlay": "ov5647",
+        "desc": "OV5647 模组"
+    },
+    {
+        "sku": "B003504",
+        "sensor": "ov5647",
+        "overlay": "ov5647",
+        "desc": "OV5647 模组"
+    },
+    {
+        "sku": "B0066",
+        "sensor": "ov5647",
+        "overlay": "ov5647",
+        "desc": "OV5647 模组"
+    },
+    {
+        "sku": "B0066-02",
+        "sensor": "ov5647",
+        "overlay": "ov5647",
+        "desc": "OV5647 模组"
+    },
+    {
+        "sku": "B006603",
+        "sensor": "ov5647",
+        "overlay": "ov5647",
+        "desc": "OV5647 模组"
+    },
+    {
+        "sku": "B006604",
+        "sensor": "ov5647",
+        "overlay": "ov5647",
+        "desc": "OV5647 模组"
+    },
+    {
+        "sku": "B006605",
+        "sensor": "ov5647",
+        "overlay": "ov5647",
+        "desc": "OV5647 模组"
+    },
+    {
+        "sku": "B0102",
+        "sensor": "imx219",
+        "overlay": "imx219",
+        "desc": "IMX219 模组"
+    },
+    {
+        "sku": "B0103",
+        "sensor": "imx219",
+        "overlay": "imx219",
+        "desc": "IMX219 模组"
+    },
+    {
+        "sku": "B0151",
+        "sensor": "ov5647",
+        "overlay": "ov5647",
+        "desc": "OV5647 模组"
+    },
+    {
+        "sku": "B0152",
+        "sensor": "imx219",
+        "overlay": "imx219",
+        "desc": "IMX219 模组"
+    },
+    {
+        "sku": "B0153",
+        "sensor": "imx219",
+        "overlay": "imx219",
+        "desc": "IMX219 模组"
+    },
+    {
+        "sku": "B0154",
+        "sensor": "imx219",
+        "overlay": "imx219",
+        "desc": "IMX219 模组"
+    },
+    {
+        "sku": "B0161",
+        "sensor": "ov7251",
+        "overlay": "ov7251",
+        "desc": "OV7251 模组"
+    },
+    {
+        "sku": "B0165",
+        "sensor": "ov9281",
+        "overlay": "ov9281",
+        "desc": "OV9281 模组"
+    },
+    {
+        "sku": "B016712MP",
+        "sensor": "imx477",
+        "overlay": "imx477",
+        "desc": "IMX477 模组"
+    },
+    {
+        "sku": "B01675MP",
+        "sensor": "ov5647",
+        "overlay": "ov5647",
+        "desc": "OV5647 模组"
+    },
+    {
+        "sku": "B01678MP",
+        "sensor": "imx219",
+        "overlay": "imx219",
+        "desc": "IMX219 模组"
+    },
+    {
+        "sku": "B0167B12",
+        "sensor": "imx477",
+        "overlay": "imx477",
+        "desc": "IMX477 模组"
+    },
+    {
+        "sku": "B0167B5",
+        "sensor": "ov5647",
+        "overlay": "ov5647",
+        "desc": "OV5647 模组"
+    },
+    {
+        "sku": "B0167B8",
+        "sensor": "imx219",
+        "overlay": "imx219",
+        "desc": "IMX219 模组"
+    },
+    {
+        "sku": "B0176",
+        "sensor": "ov5647",
+        "overlay": "ov5647",
+        "desc": "OV5647 模组"
+    },
+    {
+        "sku": "B0176R",
+        "sensor": "ov5647",
+        "overlay": "ov5647",
+        "desc": "OV5647 模组"
+    },
+    {
+        "sku": "B0180",
+        "sensor": "imx219",
+        "overlay": "imx219",
+        "desc": "IMX219 模组"
+    },
+    {
+        "sku": "B0182",
+        "sensor": "imx219",
+        "overlay": "imx219",
+        "desc": "IMX219 模组"
+    },
+    {
+        "sku": "B0184",
+        "sensor": "imx219",
+        "overlay": "imx219",
+        "desc": "IMX219 模组"
+    },
+    {
+        "sku": "B0188",
+        "sensor": "imx219",
+        "overlay": "imx219",
+        "desc": "IMX219 模组"
+    },
+    {
+        "sku": "B0190",
+        "sensor": "imx219",
+        "overlay": "imx219",
+        "desc": "IMX219 模组"
+    },
+    {
+        "sku": "B0194",
+        "sensor": "imx219",
+        "overlay": "imx219",
+        "desc": "IMX219 模组"
+    },
+    {
+        "sku": "B0206",
+        "sensor": "ov7251",
+        "overlay": "ov7251",
+        "desc": "OV7251 模组"
+    },
+    {
+        "sku": "B0224",
+        "sensor": "ov9281",
+        "overlay": "ov9281",
+        "desc": "OV9281 模组"
+    },
+    {
+        "sku": "B0240",
+        "sensor": "imx477",
+        "overlay": "imx477",
+        "desc": "IMX477 模组"
+    },
+    {
+        "sku": "B024001",
+        "sensor": "imx477",
+        "overlay": "imx477",
+        "desc": "IMX477 模组"
+    },
+    {
+        "sku": "B0240E",
+        "sensor": "imx477",
+        "overlay": "imx477",
+        "desc": "IMX477 模组"
+    },
+    {
+        "sku": "B0262",
+        "sensor": "imx477",
+        "overlay": "imx477",
+        "desc": "IMX477 模组"
+    },
+    {
+        "sku": "B0265R",
+        "sensor": "imx477",
+        "overlay": "imx477",
+        "desc": "IMX477 模组"
+    },
+    {
+        "sku": "B0266",
+        "sensor": "pivariety",
+        "overlay": "arducam-pivariety",
+        "desc": "PIVARIETY 模组"
+    },
+    {
+        "sku": "B0267",
+        "sensor": "pivariety",
+        "overlay": "arducam-pivariety",
+        "desc": "PIVARIETY 模组"
+    },
+    {
+        "sku": "B0270",
+        "sensor": "imx477",
+        "overlay": "imx477",
+        "desc": "IMX477 模组"
+    },
+    {
+        "sku": "B0272",
+        "sensor": "imx477",
+        "overlay": "imx477",
+        "desc": "IMX477 模组"
+    },
+    {
+        "sku": "B0280",
+        "sensor": "imx477",
+        "overlay": "imx477",
+        "desc": "IMX477 模组"
+    },
+    {
+        "sku": "B0286",
+        "sensor": "imx219",
+        "overlay": "imx219",
+        "desc": "IMX219 模组"
+    },
+    {
+        "sku": "B0288",
+        "sensor": "imx477",
+        "overlay": "imx477",
+        "desc": "IMX477 模组"
+    },
+    {
+        "sku": "B0303R",
+        "sensor": "imx477",
+        "overlay": "imx477",
+        "desc": "IMX477 模组"
+    },
+    {
+        "sku": "B0306",
+        "sensor": "imx708",
+        "overlay": "imx708",
+        "desc": "IMX708 模组"
+    },
+    {
+        "sku": "B0307",
+        "sensor": "imx708",
+        "overlay": "imx708",
+        "desc": "IMX708 模组"
+    },
+    {
+        "sku": "B0308",
+        "sensor": "imx708",
+        "overlay": "imx708",
+        "desc": "IMX708 模组"
+    },
+    {
+        "sku": "B0309",
+        "sensor": "imx708",
+        "overlay": "imx708",
+        "desc": "IMX708 模组"
+    },
+    {
+        "sku": "B0310",
+        "sensor": "imx708",
+        "overlay": "imx708",
+        "desc": "IMX708 模组"
+    },
+    {
+        "sku": "B0311",
+        "sensor": "imx708",
+        "overlay": "imx708",
+        "desc": "IMX708 模组"
+    },
+    {
+        "sku": "B0312",
+        "sensor": "imx708",
+        "overlay": "imx708",
+        "desc": "IMX708 模组"
+    },
+    {
+        "sku": "B031202",
+        "sensor": "imx708",
+        "overlay": "imx708",
+        "desc": "IMX708 模组"
+    },
+    {
+        "sku": "B031203",
+        "sensor": "imx708",
+        "overlay": "imx708",
+        "desc": "IMX708 模组"
+    },
+    {
+        "sku": "B0324",
+        "sensor": "pivariety",
+        "overlay": "arducam-pivariety",
+        "desc": "PIVARIETY 模组"
+    },
+    {
+        "sku": "B0331",
+        "sensor": "pivariety",
+        "overlay": "arducam-pivariety",
+        "desc": "PIVARIETY 模组"
+    },
+    {
+        "sku": "B0333",
+        "sensor": "pivariety",
+        "overlay": "arducam-pivariety",
+        "desc": "PIVARIETY 模组"
+    },
+    {
+        "sku": "B0348",
+        "sensor": "pivariety",
+        "overlay": "arducam-pivariety",
+        "desc": "PIVARIETY 模组"
+    },
+    {
+        "sku": "B0353",
+        "sensor": "pivariety",
+        "overlay": "arducam-pivariety",
+        "desc": "PIVARIETY 模组"
+    },
+    {
+        "sku": "B0367",
+        "sensor": "pivariety",
+        "overlay": "arducam-pivariety",
+        "desc": "PIVARIETY 模组"
+    },
+    {
+        "sku": "B0371",
+        "sensor": "imx519",
+        "overlay": "imx519",
+        "desc": "IMX519 模组"
+    },
+    {
+        "sku": "B0381",
+        "sensor": "pivariety",
+        "overlay": "arducam-pivariety",
+        "desc": "PIVARIETY 模组"
+    },
+    {
+        "sku": "B0386",
+        "sensor": "imx519",
+        "overlay": "imx519",
+        "desc": "IMX519 模组"
+    },
+    {
+        "sku": "B0388",
+        "sensor": "imx519",
+        "overlay": "imx519",
+        "desc": "IMX519 模组"
+    },
+    {
+        "sku": "B0389",
+        "sensor": "imx519",
+        "overlay": "imx519",
+        "desc": "IMX519 模组"
+    },
+    {
+        "sku": "B0390",
+        "sensor": "imx219",
+        "overlay": "imx219",
+        "desc": "IMX219 模组"
+    },
+    {
+        "sku": "B039001",
+        "sensor": "imx219",
+        "overlay": "imx219",
+        "desc": "IMX219 模组"
+    },
+    {
+        "sku": "B0391",
+        "sensor": "imx519",
+        "overlay": "imx519",
+        "desc": "IMX519 模组"
+    },
+    {
+        "sku": "B0392",
+        "sensor": "imx219",
+        "overlay": "imx219",
+        "desc": "IMX219 模组"
+    },
+    {
+        "sku": "B0393",
+        "sensor": "imx219",
+        "overlay": "imx219",
+        "desc": "IMX219 模组"
+    },
+    {
+        "sku": "B0394",
+        "sensor": "imx219",
+        "overlay": "imx219",
+        "desc": "IMX219 模组"
+    },
+    {
+        "sku": "B0395",
+        "sensor": "imx219",
+        "overlay": "imx219",
+        "desc": "IMX219 模组"
+    },
+    {
+        "sku": "B0396",
+        "sensor": "imx219",
+        "overlay": "imx219",
+        "desc": "IMX219 模组"
+    },
+    {
+        "sku": "B0397",
+        "sensor": "imx477",
+        "overlay": "imx477",
+        "desc": "IMX477 模组"
+    },
+    {
+        "sku": "B0399",
+        "sensor": "hawkeye",
+        "overlay": "arducam-64mp",
+        "desc": "HAWKEYE 模组"
+    },
+    {
+        "sku": "B0402",
+        "sensor": "hawkeye",
+        "overlay": "arducam-64mp",
+        "desc": "HAWKEYE 模组"
+    },
+    {
+        "sku": "B0404",
+        "sensor": "ov5647",
+        "overlay": "ov5647",
+        "desc": "OV5647 模组"
+    },
+    {
+        "sku": "B0405",
+        "sensor": "ov9281",
+        "overlay": "ov9281",
+        "desc": "OV9281 模组"
+    },
+    {
+        "sku": "B0408",
+        "sensor": "imx290",
+        "overlay": "imx290",
+        "desc": "IMX290 模组"
+    },
+    {
+        "sku": "B0410",
+        "sensor": "pivariety",
+        "overlay": "arducam-pivariety",
+        "desc": "PIVARIETY 模组"
+    },
+    {
+        "sku": "B0411",
+        "sensor": "ov9281",
+        "overlay": "ov9281",
+        "desc": "OV9281 模组"
+    },
+    {
+        "sku": "B0412",
+        "sensor": "imx378",
+        "overlay": "imx378",
+        "desc": "IMX378 模组"
+    },
+    {
+        "sku": "B0423",
+        "sensor": "imx462",
+        "overlay": "imx462",
+        "desc": "IMX462 模组"
+    },
+    {
+        "sku": "B0424",
+        "sensor": "imx290",
+        "overlay": "imx290",
+        "desc": "IMX290 模组"
+    },
+    {
+        "sku": "B0425",
+        "sensor": "imx327",
+        "overlay": "imx327",
+        "desc": "IMX327 模组"
+    },
+    {
+        "sku": "B0428",
+        "sensor": "ov5647",
+        "overlay": "ov5647",
+        "desc": "OV5647 模组"
+    },
+    {
+        "sku": "B0444",
+        "sensor": "pivariety",
+        "overlay": "arducam-pivariety",
+        "desc": "PIVARIETY 模组"
+    },
+    {
+        "sku": "B0445",
+        "sensor": "imx296",
+        "overlay": "imx296",
+        "desc": "IMX296 模组"
+    },
+    {
+        "sku": "B0449",
+        "sensor": "imx519",
+        "overlay": "imx519",
+        "desc": "IMX519 模组"
+    },
+    {
+        "sku": "B0452",
+        "sensor": "imx477",
+        "overlay": "imx477",
+        "desc": "IMX477 模组"
+    },
+    {
+        "sku": "B0466R",
+        "sensor": "imx477",
+        "overlay": "imx477",
+        "desc": "IMX477 模组"
+    },
+    {
+        "sku": "B0483",
+        "sensor": "ov64a40",
+        "overlay": "arducam-64mp",
+        "desc": "OV64A40 模组"
+    },
+    {
+        "sku": "B0484",
+        "sensor": "imx708",
+        "overlay": "imx708",
+        "desc": "IMX708 模组"
+    },
+    {
+        "sku": "B0491",
+        "sensor": "imx219",
+        "overlay": "imx219",
+        "desc": "IMX219 模组"
+    },
+    {
+        "sku": "B0492R",
+        "sensor": "pivariety",
+        "overlay": "arducam-pivariety",
+        "desc": "PIVARIETY 模组"
+    },
+    {
+        "sku": "B0513",
+        "sensor": "hawkeye",
+        "overlay": "arducam-64mp",
+        "desc": "HAWKEYE 模组"
+    },
+    {
+        "sku": "B0526",
+        "sensor": "pivariety",
+        "overlay": "arducam-pivariety",
+        "desc": "PIVARIETY 模组"
+    },
+    {
+        "sku": "B0549",
+        "sensor": "imx219",
+        "overlay": "imx219",
+        "desc": "IMX219 模组"
+    },
+    {
+        "sku": "B0550",
+        "sensor": "imx477",
+        "overlay": "imx477",
+        "desc": "IMX477 模组"
+    },
+    {
+        "sku": "B0568",
+        "sensor": "imx335",
+        "overlay": "imx335",
+        "desc": "IMX335 模组"
+    },
+    {
+        "sku": "B0569",
+        "sensor": "imx415",
+        "overlay": "imx415",
+        "desc": "IMX415 模组"
+    },
+    {
+        "sku": "B0584",
+        "sensor": "imx708",
+        "overlay": "imx708",
+        "desc": "IMX708 模组"
+    }
+]
