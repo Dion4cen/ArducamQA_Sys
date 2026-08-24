@@ -1,15 +1,18 @@
 import os
 import json
 import datetime
+import subprocess
+import re
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, 
     QPushButton, QTabWidget, QTextEdit, QMessageBox, QRadioButton, 
     QButtonGroup, QLineEdit, QSpinBox, QFileDialog, QProgressBar, QTableWidget, 
     QTableWidgetItem, QHeaderView, QGroupBox, QGridLayout, QCompleter, QFrame,
-    QSizePolicy
+    QSizePolicy, QComboBox
 )
 from PyQt6.QtCore import Qt, QProcess, QTimer, QStringListModel
-from PyQt6.QtGui import QPixmap
+from PyQt6.QtGui import QPixmap, QIntValidator
+
 
 # 兼容原有的核心库引用
 from core.def_database import DataEngine, generate_default_data, deduce_overlay
@@ -229,6 +232,7 @@ class QATestCenter(QMainWindow):
         self.cam_job = QProcess()
         self.cam_job.readyReadStandardOutput.connect(lambda: self._proc_std(self.cam_job, False))
         self.cam_job.readyReadStandardError.connect(lambda: self._proc_std(self.cam_job, True))
+        self.cam_job.finished.connect(self._on_cam_job_finished)
         
         self.task_job = QProcess()
         self.task_job.finished.connect(self._task_end)
@@ -449,70 +453,331 @@ class QATestCenter(QMainWindow):
             ok = QMessageBox.question(self, "配置完成", f"驱动已成功更新为: dtoverlay={target['overlay']}\n\n是否立即重启设备以生效？", QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
             if ok == QMessageBox.StandardButton.Yes: 
                 QProcess.startDetached("sudo", ["reboot"])
-
-    # ---------- 2. 画面质检 ----------
+# ---------- 2. 画面质检 (全画幅与预览分辨率高阶控制) ----------
     def _tab_quality(self):
         pan = QWidget()
         vlay = QVBoxLayout(pan)
-        vlay.setContentsMargins(18, 18, 18, 18)
+        vlay.setContentsMargins(18, 16, 18, 16)
+        vlay.setSpacing(16)
         
-        cfg_r = QGroupBox("视觉预览参数")
-        ly = QHBoxLayout()
-        ly.setContentsMargins(20, 24, 20, 24)
+        # === Group 1: 显示窗口配置 ===
+        grp_display = QGroupBox("1. 显示窗口配置 (Display Mode)")
+        ly_disp = QHBoxLayout()
+        ly_disp.setContentsMargins(20, 24, 20, 24)
         
-        self.rad_w = QRadioButton("标准窗口模式")
+        self.rad_w = QRadioButton("标准窗口模式 (Default)")
         self.rad_w.setChecked(True)
-        self.rad_f = QRadioButton("全屏模式")
+        self.rad_f = QRadioButton("全屏模式 (Fullscreen)")
         
-        ly.addWidget(self.rad_w)
-        ly.addWidget(self.rad_f)
-        cfg_r.setLayout(ly)
-        vlay.addWidget(cfg_r)
+        ly_disp.addWidget(self.rad_w)
+        ly_disp.addWidget(self.rad_f)
+        ly_disp.addStretch()
+        grp_display.setLayout(ly_disp)
+        vlay.addWidget(grp_display)
         
-        vlay.addSpacing(20)
+        # === Group 2: 视场角与预览分辨率配置 ===
+        grp_res = QGroupBox("2. 视场角与预览分辨率预设 (Preview Resolution)")
+        ly_res = QVBoxLayout()
+        ly_res.setContentsMargins(20, 20, 20, 20)
+        ly_res.setSpacing(14)
         
-        btn_box = QHBoxLayout()
-        btn_box.addStretch()
+        self.rad_res_max = QRadioButton("全画幅最大分辨率 (Full FOV Max - 默认原生画幅)")
+        self.rad_res_max.setChecked(True)
+        self.rad_res_bin = QRadioButton("2x2 Binning 模式 (Full FOV - 提升预览帧率)")
+        self.rad_res_1080 = QRadioButton("标准 1080P 模式 (1920x1080)")
+        self.rad_res_custom = QRadioButton("高级自定义 / 硬件原生模式 (Hardware Native)")
+        
+        # 绑定单选切换事件，控制自定义面板的启停
+        self.rad_res_custom.toggled.connect(self._toggle_custom_panel)
+        
+        ly_res.addWidget(self.rad_res_max)
+        ly_res.addWidget(self.rad_res_bin)
+        ly_res.addWidget(self.rad_res_1080)
+        ly_res.addWidget(self.rad_res_custom)
+        
+        # --- 自定义/原生模式探索面板 ---
+        self.custom_panel = QWidget()
+        self.custom_panel.setEnabled(False) # 默认禁用，选中自定义时开启
+        ly_custom = QHBoxLayout(self.custom_panel)
+        ly_custom.setContentsMargins(28, 0, 0, 0) # 往右缩进产生层级感
+        ly_custom.setSpacing(12)
+        
+        self.btn_fetch_modes = QPushButton("读取当前相机原生模式")
+        self.btn_fetch_modes.setObjectName("SecondaryBtn")
+        self.btn_fetch_modes.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_fetch_modes.clicked.connect(self._fetch_camera_modes)
+        
+        self.cb_native_modes = QComboBox()
+        self.cb_native_modes.setMinimumWidth(180)
+        
+        self.inp_custom_w = QLineEdit()
+        self.inp_custom_w.setPlaceholderText("宽(W)")
+        self.inp_custom_w.setValidator(QIntValidator(100, 10000))
+        self.inp_custom_w.setFixedWidth(70)
+        
+        lbl_x = QLabel("x")
+        lbl_x.setStyleSheet("color: #64748B; font-weight: bold;")
+        
+        self.inp_custom_h = QLineEdit()
+        self.inp_custom_h.setPlaceholderText("高(H)")
+        self.inp_custom_h.setValidator(QIntValidator(100, 10000))
+        self.inp_custom_h.setFixedWidth(70)
+        
+        # 联动下拉框与手动输入框
+        self.cb_native_modes.currentTextChanged.connect(self._on_native_mode_selected)
+        
+        ly_custom.addWidget(self.btn_fetch_modes)
+        ly_custom.addWidget(self.cb_native_modes)
+        ly_custom.addSpacing(10)
+        ly_custom.addWidget(QLabel("手动覆盖:"))
+        ly_custom.addWidget(self.inp_custom_w)
+        ly_custom.addWidget(lbl_x)
+        ly_custom.addWidget(self.inp_custom_h)
+        ly_custom.addStretch()
+        
+        ly_res.addWidget(self.custom_panel)
+        grp_res.setLayout(ly_res)
+        vlay.addWidget(grp_res)
+        
+        vlay.addSpacing(24)
+        
+        # === 底部操作大按钮区域 ===
+        btn_box = QVBoxLayout()
+        btn_box.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        
         self.btn_act = QPushButton("启动实时画面流")
         self.btn_act.setObjectName("PrimaryActionBtn")
-        self.btn_act.setFixedSize(320, 48)
+        self.btn_act.setFixedSize(340, 50) 
         self.btn_act.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_act.clicked.connect(self._fire_cam_visual)
+        
+        hint_lbl = QLabel("提示：全画幅模式可确保 100% 物理视场角；全屏预览时可按键盘【Alt】+ 【F4】退出。")
+        hint_lbl.setStyleSheet("color: #64748B; font-size: 13px; font-weight: 500; margin-top: 8px;")
+        hint_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        
         btn_box.addWidget(self.btn_act)
-        btn_box.addStretch()
+        btn_box.addWidget(hint_lbl)
         
         vlay.addLayout(btn_box)
         vlay.addStretch()
-        self.dash_tab.addTab(pan, "2. 画面质检")
         
+        self.dash_tab.addTab(pan, "2. 画面质检")
+
+    def _toggle_custom_panel(self, checked):
+        """控制自定义分辨率输入面板的激活状态"""
+        self.custom_panel.setEnabled(checked)
+
+    def _on_native_mode_selected(self, text):
+        """当用户在下拉框选择硬件模式时，自动填入后方的输入框"""
+        if "x" in text:
+            parts = text.split("x")
+            self.inp_custom_w.setText(parts[0].strip())
+            self.inp_custom_h.setText(parts[1].strip())
+
+    def _fetch_camera_modes(self):
+        """调用 rpicam-hello 获取底层驱动支持的 Sensor 原生 Mode 列表"""
+        self.cb_native_modes.clear()
+        self.btn_fetch_modes.setText("读取中...")
+        self.btn_fetch_modes.setEnabled(False)
+        self.out_print("开始探测硬件底层原生传感器模式 (Hardware Mode Probing)...", "#0284C7")
+        
+        try:
+            result = subprocess.run(['rpicam-hello', '--list-cameras'], capture_output=True, text=True, timeout=5)
+            output = result.stdout
+            
+            # 正则提取形如 '4656x3496' 的分辨率串
+            modes = re.findall(r'(\d+)x(\d+)\s+\[', output)
+            
+            if not modes:
+                QMessageBox.warning(self, "探测失败", "未能解析到硬件原生模式，请确保相机已正确连接并配置。")
+                self.out_print("硬件探测失败，未找到可用 Mode。", "#EF4444")
+            else:
+                # 剔除重复项并按面积降序排列
+                unique_modes = sorted(list(set(modes)), key=lambda x: int(x[0])*int(x[1]), reverse=True)
+                for w, h in unique_modes:
+                    self.cb_native_modes.addItem(f"{w}x{h}")
+                self.out_print(f"探测成功！共发现 {len(unique_modes)} 种原生模式。", "#059669")
+                
+        except Exception as e:
+            QMessageBox.critical(self, "执行错误", f"探测命令执行失败:\n{str(e)}")
+            self.out_print(f"探测异常: {str(e)}", "#EF4444")
+            
+        finally:
+            self.btn_fetch_modes.setText("读取当前相机原生模式")
+            self.btn_fetch_modes.setEnabled(True)
+
     def _fire_cam_visual(self):
+        """组装参数并启动预览流"""
         if self.cam_job.state() == QProcess.ProcessState.NotRunning:
             opts = ["-t", "0"]
-            if self.rad_f.isChecked(): opts.append("-f")
+            
+            # 1. 窗口模式组装
+            if self.rad_f.isChecked(): 
+                opts.append("--fullscreen")
+            
+            # 2. 预览分辨率组装 (使用 --viewfinder-mode 控制预览通道尺寸)
+            if self.rad_res_max.isChecked():
+                # 强行破解底层限制：静默探测相机的物理最大分辨率，并强制要求预览通道使用该分辨率
+                self.out_print("正在探查底层物理最大分辨率...", "#64748B")
+                max_w, max_h = self._get_max_resolution_silently()
+                
+                if max_w and max_h:
+                    opts.extend(["--viewfinder-mode", f"{max_w}:{max_h}"])
+                    self.out_print(f"请求画面流：[全画幅最大分辨率] 已强制锁定原生画幅 {max_w}x{max_h}", "#38BDF8")
+                else:
+                    self.out_print("警告: 物理画幅探测失败，交由底层自适应调度", "#F59E0B")
+                
+            elif self.rad_res_bin.isChecked():
+                # 指定一个通用的 2x2 binning 级别预览分辨率
+                opts.extend(["--viewfinder-mode", "2028:1520"]) 
+                self.out_print("请求画面流：[Binning 高帧率模式]", "#38BDF8")
+                
+            elif self.rad_res_1080.isChecked():
+                opts.extend(["--viewfinder-mode", "1920:1080"])
+                self.out_print("请求画面流：[标准 1080P]", "#38BDF8")
+                
+            elif self.rad_res_custom.isChecked():
+                cw = self.inp_custom_w.text().strip()
+                ch = self.inp_custom_h.text().strip()
+                if not cw or not ch:
+                    QMessageBox.warning(self, "参数缺失", "请手动输入宽度和高度，或从原生模式下拉框中选择。")
+                    return
+                opts.extend(["--viewfinder-mode", f"{cw}:{ch}"])
+                self.out_print(f"请求画面流：[自定义/原生模式] {cw}x{ch}", "#38BDF8")
+
+            # 启动子进程
             self.cam_job.start("rpicam-still", opts)
-            self.btn_act.setText("终止预览进程")
+            
+            self.btn_act.setText("停止画面流 (Terminate)")
             self.btn_act.setObjectName("DangerActionBtn")
             self.btn_act.setStyle(self.btn_act.style())
+            
         else:
+            # 安全终止进程
             self.cam_job.terminate()
             self.cam_job.waitForFinished(1000)
             if self.cam_job.state() != QProcess.ProcessState.NotRunning: 
                 self.cam_job.kill() 
+                
             self.btn_act.setText("启动实时画面流")
             self.btn_act.setObjectName("PrimaryActionBtn")
             self.btn_act.setStyle(self.btn_act.style())
+            self.out_print("画面流已被用户终止。", "#64748B")
+    def _on_cam_job_finished(self, exit_code, exit_status):
+        """无论进程是自然结束还是被 Alt+F4 强杀，都会触发此函数，安全重置按钮状态"""
+        self.btn_act.setText("启动实时画面流")
+        self.btn_act.setObjectName("PrimaryActionBtn")
+        self.btn_act.setStyle(self.btn_act.style())
+        self.out_print("画面流进程已结束 (窗口已关闭)。", "#64748B")
 
-    # ---------- 3. 单张拍照 ----------
+    def _fire_cam_visual(self):
+        """组装参数并启动预览流"""
+        if self.cam_job.state() == QProcess.ProcessState.NotRunning:
+            opts = ["-t", "0"]
+            if self.rad_f.isChecked(): opts.append("--fullscreen")
+            
+            if self.rad_res_max.isChecked():
+                self.out_print("正在探查底层物理最大分辨率...", "#64748B")
+                max_w, max_h = self._get_max_resolution_silently()
+                if max_w and max_h:
+                    opts.extend(["--viewfinder-mode", f"{max_w}:{max_h}"])
+                    self.out_print(f"请求画面流：[全画幅最大分辨率] {max_w}x{max_h}", "#38BDF8")
+                else:
+                    self.out_print("警告: 物理画幅探测失败，交由底层自适应调度", "#F59E0B")
+            elif self.rad_res_bin.isChecked():
+                opts.extend(["--viewfinder-mode", "2028:1520"]) 
+                self.out_print("请求画面流：[Binning 模式]", "#38BDF8")
+            elif self.rad_res_1080.isChecked():
+                opts.extend(["--viewfinder-mode", "1920:1080"])
+                self.out_print("请求画面流：[标准 1080P]", "#38BDF8")
+            elif self.rad_res_custom.isChecked():
+                cw = self.inp_custom_w.text().strip()
+                ch = self.inp_custom_h.text().strip()
+                if not cw or not ch:
+                    QMessageBox.warning(self, "参数缺失", "请手动输入宽度和高度。")
+                    return
+                opts.extend(["--viewfinder-mode", f"{cw}:{ch}"])
+                self.out_print(f"请求画面流：[自定义] {cw}x{ch}", "#38BDF8")
+
+            self.cam_job.start("rpicam-still", opts)
+            self.btn_act.setText("停止画面流 (Terminate)")
+            self.btn_act.setObjectName("DangerActionBtn")
+            self.btn_act.setStyle(self.btn_act.style())
+        else:
+            # 安全终止进程，终止后会自动触发 _on_cam_job_finished 恢复按钮状态
+            self.cam_job.terminate()
+            self.cam_job.waitForFinished(1000)
+            if self.cam_job.state() != QProcess.ProcessState.NotRunning: 
+                self.cam_job.kill()
+
+    def _get_max_resolution_silently(self):
+        """后台静默获取相机的最大支持分辨率"""
+        try:
+            import subprocess
+            import re
+            # 执行底层探测指令
+            result = subprocess.run(['rpicam-hello', '--list-cameras'], capture_output=True, text=True, timeout=3)
+            modes = re.findall(r'(\d+)x(\d+)\s+\[', result.stdout)
+            
+            if modes:
+                # 算出面积最大的那个模式
+                unique_modes = sorted(list(set(modes)), key=lambda x: int(x[0])*int(x[1]), reverse=True)
+                return unique_modes[0][0], unique_modes[0][1] # 返回最大 宽, 高
+        except Exception:
+            pass
+        return None, None
+    
+    # ---------- 3. 单张拍照 (全面升级分辨率控制与动态命名) ----------
     def _tab_foto(self):
         u = QWidget()
         a = QVBoxLayout(u)
         a.setContentsMargins(18, 18, 18, 18)
         
-        self.pt = QLineEdit(os.path.expanduser("~/Pictures/QA_Captures"))
+        # === 捕获分辨率配置 ===
+        grp_res = QGroupBox("1. 捕获分辨率预设 (Capture Resolution)")
+        ly_res = QVBoxLayout()
+        ly_res.setContentsMargins(20, 20, 20, 20)
+        ly_res.setSpacing(14)
+        
+        self.rad_cap_max = QRadioButton("全画幅最大分辨率 (Full FOV Max)")
+        self.rad_cap_max.setChecked(True)
+        self.rad_cap_bin = QRadioButton("2x2 Binning 模式 (提升信噪比/夜视能力)")
+        self.rad_cap_1080 = QRadioButton("标准 1080P 模式 (1920x1080)")
+        
+        # 自定义分辨率行
+        cap_custom_ly = QHBoxLayout()
+        self.rad_cap_custom = QRadioButton("自定义分辨率:")
+        self.inp_cap_w = QLineEdit()
+        self.inp_cap_w.setPlaceholderText("宽(W)")
+        self.inp_cap_w.setValidator(QIntValidator(100, 10000))
+        self.inp_cap_w.setFixedWidth(70)
+        self.inp_cap_h = QLineEdit()
+        self.inp_cap_h.setPlaceholderText("高(H)")
+        self.inp_cap_h.setValidator(QIntValidator(100, 10000))
+        self.inp_cap_h.setFixedWidth(70)
+        lbl_x = QLabel("x")
+        lbl_x.setStyleSheet("color: #64748B; font-weight: bold;")
+        
+        cap_custom_ly.addWidget(self.rad_cap_custom)
+        cap_custom_ly.addWidget(self.inp_cap_w)
+        cap_custom_ly.addWidget(lbl_x)
+        cap_custom_ly.addWidget(self.inp_cap_h)
+        cap_custom_ly.addStretch()
+        
+        ly_res.addWidget(self.rad_cap_max)
+        ly_res.addWidget(self.rad_cap_bin)
+        ly_res.addWidget(self.rad_cap_1080)
+        ly_res.addLayout(cap_custom_ly)
+        grp_res.setLayout(ly_res)
+        a.addWidget(grp_res)
+        
+        # === 图像保存配置 ===
+        self.pt = QLineEdit(os.path.expanduser("/home/pi/Pictures/QA_Captures"))
         self.dl = QSpinBox()
         self.dl.setRange(20, 60000)
         self.dl.setValue(1000) 
-        self.nt = QLineEdit("{sensor}_{time}.jpg")
+        # 💡 新增 {width} 和 {height} 智能占位符
+        self.nt = QLineEdit("{sensor}_{width}x{height}_{time}.jpg")
         
         gp = QGridLayout()
         gp.setContentsMargins(20, 24, 20, 24)
@@ -532,13 +797,12 @@ class QATestCenter(QMainWindow):
         gp.addWidget(QLabel("预览时间 (ms):"), 1, 0)
         gp.addWidget(self.dl, 1, 1)
         
-        gp.addWidget(QLabel("文件命名规则:"), 2, 0)
+        gp.addWidget(QLabel("智能命名规则:"), 2, 0)
         gp.addWidget(self.nt, 2, 1)
         
-        gg = QGroupBox("图像捕获配置")
+        gg = QGroupBox("2. 图像保存设置 (File Settings)")
         gg.setLayout(gp)
         a.addWidget(gg)
-        
         
         a.addSpacing(20)
         
@@ -575,12 +839,43 @@ class QATestCenter(QMainWindow):
             
         sensor_tag = self.active_in_test_sku['sensor'] if self.active_in_test_sku else "camera"
         os.makedirs(self.pt.text(), exist_ok=True)
-        targ_str = self.nt.text().replace("{sensor}", sensor_tag).replace("{time}", datetime.datetime.now().strftime("%Y%m%d_%H%M%S"))
-        dest_n = os.path.join(self.pt.text(), targ_str)
         
-        self.task_job.start("rpicam-still", ["-t", str(self.dl.value()), "-o", dest_n])
+        # 1. 解析目标分辨率
+        opts = ["-t", str(self.dl.value())]
+        cap_w, cap_h = "MAX", "MAX" # 兜底名
+        
+        if self.rad_cap_max.isChecked():
+            # 静默获取物理分辨率以精准命名
+            cw, ch = self._get_max_resolution_silently()
+            if cw and ch:
+                cap_w, cap_h = cw, ch
+                opts.extend(["--width", cw, "--height", ch])
+        elif self.rad_cap_bin.isChecked():
+            cap_w, cap_h = "2028", "1520"
+            opts.extend(["--width", cap_w, "--height", cap_h])
+        elif self.rad_cap_1080.isChecked():
+            cap_w, cap_h = "1920", "1080"
+            opts.extend(["--width", cap_w, "--height", cap_h])
+        elif self.rad_cap_custom.isChecked():
+            cap_w = self.inp_cap_w.text().strip()
+            cap_h = self.inp_cap_h.text().strip()
+            if not cap_w or not cap_h:
+                QMessageBox.warning(self, "参数缺失", "请手动输入自定义的宽和高。")
+                return
+            opts.extend(["--width", cap_w, "--height", cap_h])
+
+        # 2. 动态替换文件名占位符
+        targ_str = self.nt.text().replace("{sensor}", sensor_tag)\
+                                 .replace("{width}", str(cap_w))\
+                                 .replace("{height}", str(cap_h))\
+                                 .replace("{time}", datetime.datetime.now().strftime("%Y%m%d_%H%M%S"))
+        
+        dest_n = os.path.join(self.pt.text(), targ_str)
+        opts.extend(["-o", dest_n])
+        
+        self.task_job.start("rpicam-still", opts)
         self.bp.setEnabled(False)
-        self.bp.setText("处理中...")
+        self.bp.setText("图像捕获中...")
         self.last_target_n = dest_n
 
     def _task_end(self, stat):
