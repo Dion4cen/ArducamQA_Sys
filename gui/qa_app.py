@@ -11,7 +11,7 @@ from PyQt6.QtWidgets import (
     QSizePolicy, QComboBox
 )
 from PyQt6.QtCore import Qt, QProcess, QTimer, QStringListModel
-from PyQt6.QtGui import QPixmap, QIntValidator
+from PyQt6.QtGui import QPixmap, QIntValidator, QIcon
 
 
 # 兼容原有的核心库引用
@@ -115,21 +115,36 @@ class QATestCenter(QMainWindow):
         }
 
         /* 全局胶囊搜索栏 (完美替换原先别扭的文字) */
-        QLineEdit#GlobalSearchBar {
+         QLineEdit#GlobalSearchBar {
             background-color: #F8FAFC;
             border: 1px solid #CBD5E1;
-            border-radius: 18px; 
-            padding: 8px 20px;
+            border-radius: 19px; /* 高度38的一半，完美半圆胶囊 */
+            padding: 0px 14px;   /* 左侧增加 14px 留白，让放大镜不要太靠边 */
             font-size: 13px;
             color: #0F172A;
         }
         QLineEdit#GlobalSearchBar:focus {
             background-color: #FFFFFF;
             border: 2px solid #0284C7;
-            padding: 7px 19px; 
+            padding: 0px 13px; /* 减去边框增加的 1px，防止获取焦点时文字左右抖动 */
+        }
+
+        /* 表格过滤搜索栏 (配套胶囊风格) */
+        QLineEdit#TableFilterBar {
+            background-color: #F8FAFC;
+            border: 1px solid #CBD5E1;
+            border-radius: 16px; /* 高度32的一半 */
+            padding: 0px 12px;
+            font-size: 13px;
+            color: #0F172A;
+        }
+        QLineEdit#TableFilterBar:focus {
+            background-color: #FFFFFF;
+            border: 2px solid #0284C7;
+            padding: 0px 11px;
         }
         QLineEdit#GlobalSearchBar::placeholder {
-            color: #94A3B8;
+             color: #94A3B8;
         }
 
         /* 常规输入框 */
@@ -300,8 +315,11 @@ class QATestCenter(QMainWindow):
         
         self.search_input = QLineEdit()
         self.search_input.setObjectName("GlobalSearchBar")
-        self.search_input.setPlaceholderText("🔍 搜索并快速切换 SKU 或 芯片型号...")
-        self.search_input.setFixedSize(400, 38) # 更宽更大气
+        self.search_input.setPlaceholderText("搜索并快速切换 SKU 或 芯片型号...")
+        self.search_input.setTextMargins(-8, 0, 0, 0)
+        self.search_input.setFixedSize(400, 38)
+        self.search_input.addAction(QIcon.fromTheme("edit-find"), QLineEdit.ActionPosition.LeadingPosition)
+        self.search_input.setFixedSize(400, 38)
 
         self.search_model = QStringListModel()
         self.completer = QCompleter(self.search_model, self)
@@ -1077,7 +1095,9 @@ class QATestCenter(QMainWindow):
         
         header_bar = QHBoxLayout()
         self.filter_input = QLineEdit()
-        self.filter_input.setPlaceholderText("🔍 表格筛选 (输入 SKU 或芯片名称)")
+        self.filter_input.setPlaceholderText("表格筛选 (输入 SKU 或芯片名称)")
+        self.filter_input.addAction(QIcon.fromTheme("edit-find"), QLineEdit.ActionPosition.LeadingPosition)
+        self.filter_input.setTextMargins(-8, 0, 0, 0)
         self.filter_input.setFixedSize(300, 32)
         self.filter_input.textChanged.connect(self._filter_table)
         header_bar.addWidget(self.filter_input)
