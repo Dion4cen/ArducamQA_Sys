@@ -590,7 +590,7 @@
     {
         "sku": "B0483",
         "sensor": "ov64a40",
-        "overlay": "arducam-64mp",
+        "overlay": "ov64a40",
         "desc": "OV64A40 模组"
     },
     {
